@@ -43,7 +43,7 @@ class SMPSys(object):
         # self.id = self.__class__.__name__
         for k, v in conf.items():
             setattr(self, k, v)
-            print "%s.init self.%s = %s" % (self.__class__.__name__, k, v)
+            # print "%s.init self.%s = %s" % (self.__class__.__name__, k, v)
 
     def step(self, x):
         return None
@@ -77,11 +77,14 @@ params:
         
     def step(self, x = None, world = None):
         """update the robot, pointmass"""
-        print "%s.step world = %s, x = %s" % (self.__class__.__name__, world, x)
+        # print "%s.step[%d] x = %s" % (self.__class__.__name__, self.cnt, x)
         # x = self.inputs['u'][0]
         self.apply_force(x)
-        return {"s_proprio": self.compute_sensors_proprio(),
-                "s_extero": self.compute_sensors_extero()}
+        # return dict of state values
+        return {'s_proprio': self.compute_sensors_proprio(),
+                's_extero':  self.compute_sensors_extero(),
+                's_all':     self.compute_sensors(),
+        }
         
     def bound_motor(self, m):
         return np.clip(m, self.force_min, self.force_max)
@@ -112,7 +115,7 @@ params:
         # print "v", v
         p = self.x[:self.sysdim] + v * self.dt
 
-        # collect temporary state description into joint state vector
+        # collect temporary state description (p,v,a) into joint state vector x
         self.x[:self.sysdim] = p.copy()
         self.x[self.sysdim:self.sysdim*2] = v.copy()
         self.x[self.sysdim*2:] = a.copy()
@@ -137,4 +140,4 @@ params:
     
     def compute_sensors(self):
         """compute the proprio and extero sensor values from state"""
-        return 
+        return self.x
