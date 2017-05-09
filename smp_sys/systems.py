@@ -14,6 +14,7 @@ signal generator, ...
 will probably not produce any interesting output without any
 input. Examples are all actual simulated and real robots, things with
 motors, things that can move or somehow do stuff in any kind of world.
+
 """
 
 # existing systems in legacy code for pulling in
@@ -35,6 +36,10 @@ motors, things that can move or somehow do stuff in any kind of world.
 # smp/morse_work/turtlebot
 # smp/morse_work/quadrotor
 # ...?
+
+# TODO
+#  - A system should be given a reference to a 'world' that implies
+#    constraints on state values and provides autonmous activity.
 
 import numpy as np
 
@@ -68,7 +73,8 @@ params:
         
         # state is (pos, vel, acc).T
         # self.state_dim
-        self.x0 = np.zeros((self.statedim, 1))
+        if not hasattr(self, 'x0'):
+            self.x0 = np.zeros((self.statedim, 1))
         self.x  = self.x0.copy()
         self.cnt = 0
 
