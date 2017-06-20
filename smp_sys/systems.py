@@ -35,11 +35,13 @@ motors, things that can move or somehow do stuff in any kind of world.
 # smp/morse_work/atrv
 # smp/morse_work/turtlebot
 # smp/morse_work/quadrotor
-# ...?
+# bha model
+# ntrtsim
+# malmo
 
 # TODO
 #  - A system should be given a reference to a 'world' that implies
-#    constraints on state values and provides autonmous activity.
+#    constraints on state values and provides autonmous activity from outside the agent
 
 import numpy as np
 
@@ -201,6 +203,8 @@ def joint_positions(angles, lengths, unit='rad'):
 
     .. warning:: angles and lengths should be the same size.
     """
+    # print "angles", angles, "lengths", lengths
+    
     if len(angles) != len(lengths):
         raise ValueError('angles and lengths must be the same size!')
 
