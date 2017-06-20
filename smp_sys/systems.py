@@ -232,7 +232,7 @@ class SimplearmSys(SMPSys):
         "force_min": -1.0,
         "friction": 0.001,
         "sysnoise": 1e-2,
-        'dim_s_motor': 1,
+        'dim_s_motor': 3,
         'length_ratio': [1],
         'm_mins': -1,
         'm_maxs': 1,
@@ -271,16 +271,16 @@ class SimplearmSys(SMPSys):
     def reset(self):
         self.x = self.x0.copy()
         
-    def step(self, x = None, world = None):
-        """update the robot, pointmass"""
-        # print "%s.step[%d] x = %s" % (self.__class__.__name__, self.cnt, x)
-        # x = self.inputs['u'][0]
-        self.apply_force(x)
-        # return dict of state values
-        return {'s_proprio': self.compute_sensors_proprio(),
-                's_extero':  self.compute_sensors_extero(),
-                's_all':     self.compute_sensors(),
-        }
+    # def step(self, x = None, world = None):
+    #     """update the robot, pointmass"""
+    #     # print "%s.step[%d] x = %s" % (self.__class__.__name__, self.cnt, x)
+    #     # x = self.inputs['u'][0]
+    #     self.apply_force(x)
+    #     # return dict of state values
+    #     return {'s_proprio': self.compute_sensors_proprio(),
+    #             's_extero':  self.compute_sensors_extero(),
+    #             's_all':     self.compute_sensors(),
+    #     }
         
 
     def compute_lengths(self, n_dofs, ratio):
@@ -294,13 +294,15 @@ class SimplearmSys(SMPSys):
         return np.clip(m, self.m_mins, self.m_maxs)
 
     def compute_sensors_proprio(self):
-        return self.m
+        # hand_pos += 
+        return self.m + self.sysnoise * np.random.randn(*self.m.shape)
 
     def step(self, x):
         """update the robot, pointmass"""
-        print "%s.step x = %s" % (self.__class__.__name__, x)
+        # print "%s.step x = %s" % (self.__class__.__name__, x)
         # print "x", x.shape
-        self.m = self.compute_motor_command(self.m + x)# .reshape((self.dim_s_motor, 1))
+        # self.m = self.compute_motor_command(self.m + x)# .reshape((self.dim_s_motor, 1))
+        self.m = self.compute_motor_command(x)# .reshape((self.dim_s_motor, 1))
         
         # print "m", m
         # self.apply_force(x)
@@ -317,7 +319,8 @@ class SimplearmSys(SMPSys):
 
     def compute_sensors(self):
         """compute the proprio and extero sensor values from state"""
-        return np.vstack((self.m, self.compute_sensors_extero()))
+        # return np.vstack((self.m, self.compute_sensors_extero()))
+        return np.vstack((self.compute_sensors_proprio(), self.compute_sensors_extero()))
         # return self.x
     
 # class SimpleArmRobot(Robot2):
@@ -363,6 +366,7 @@ class SimplearmSys(SMPSys):
 
     
 sysclasses = [SimplearmSys, PointmassSys]
+# sysclasses = [SimplearmSys]
 
 
 if __name__ == "__main__":
@@ -378,13 +382,18 @@ if __name__ == "__main__":
         c_ = c(conf = c.defaults)
         c_data = []
         for i in range(1000):
-            d = c_.step(x = c_.compute_sensors_proprio() * 0.98)['s_all'].copy()
-            # print "d", d
+            # do proprio feedback
+            x = c_.compute_sensors_proprio() * 0.1
+            # print "x", x
+            # step system with feedback input
+            d = c_.step(x = np.roll(x, shift = 1) * -1.0)['s_all'].copy()
+            # print "d", d.shape
             c_data.append(d)
 
         # print c_data
         # print np.array(c_data).shape
 
         import matplotlib.pylab as plt
+        # remove additional last axis
         plt.plot(np.array(c_data)[...,0])
         plt.show()
