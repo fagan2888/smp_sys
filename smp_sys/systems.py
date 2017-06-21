@@ -65,7 +65,9 @@ class SMPSys(object):
             
     def step(self, x):
         return None
-
+    
+################################################################################
+# point mass system
 class PointmassSys(SMPSys):
     """point mass system (pm)
 
@@ -177,7 +179,9 @@ class PointmassSys(SMPSys):
         return self.x
 
 
-
+################################################################################
+# simple arm system, from explauto
+    
 def forward(angles, lengths):
     """ Link object as defined by the standard DH representation.
 
