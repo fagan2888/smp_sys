@@ -1,0 +1,22 @@
+#+TITLE: smp_sys
+#+AUTHOR: Oswald Berthold
+
+#+OPTIONS: toc:nil ^:nil
+
+* smp_sys
+
+Part of the sensorimotor primitives aka /smp/ ecosystem designed to
+cooperate with [[https://github.com/x75/smp_base][smp_base]] and [[https://github.com/x75/smp_graphs][smp_graphs]]. The /sys/ part stands for
+systems, where a system is anything that produces data. This can be a
+robot, or a logfile reader but also an economy or a social process.
+
+** Implemented systems
+  - n-dimensional point mass (the simplest robot with motility,
+    i.e. that can move it's base)
+  - simplearm (flowersteam's [[https://github.com/flowersteam/explauto][explauto]])
+  - bha (bionic handling assistant model, python port by
+    [[https://github.com/gitmatti][Mathias Schmerling]] of the [[https://code.cor-lab.de/projects/goal-babbling-matlab][bha matlab model]])
+  - more coming, stay tuned
+
+** Notes
+  -  For BHA see also https://www.cor-lab.de/bionic-handling-assistant
