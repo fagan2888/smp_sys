@@ -57,6 +57,9 @@ class SMPSys(object):
             setattr(self, k, v)
             # print "%s.init self.%s = %s" % (self.__class__.__name__, k, v)
 
+        # FIXME: check for sensorimotor delay configuration
+        # FIXME: check for motor range configuration
+            
         # ROS
         if hasattr(self, 'ros') and self.ros:
             # rospy.init_node(self.name)
@@ -277,6 +280,7 @@ class SimplearmSys(SMPSys):
         self.m = np.zeros((self.dim_s_motor, 1))
         
     def reset(self):
+        """SimplearmSys.reset"""
         self.x = self.x0.copy()
         
     # def step(self, x = None, world = None):
@@ -292,21 +296,30 @@ class SimplearmSys(SMPSys):
         
 
     def compute_lengths(self, n_dofs, ratio):
+        """SimplearmSys.reset"""
         l = np.ones(n_dofs)
         for i in range(1, n_dofs):
             l[i] = l[i-1] / ratio
         return l / sum(l)
 
     def compute_motor_command(self, m):
+        """SimplearmSys.reset"""
         m *= self.factor
-        return np.clip(m, self.m_mins, self.m_maxs)
+        # print "m", m.shape, "m_mins", self.m_mins, "m_maxs", self.m_maxs
+        ret = np.clip(m.T, self.m_mins, self.m_maxs).T
+        # print "ret.shape", ret.shape
+        return ret
 
     def compute_sensors_proprio(self):
+        """SimplearmSys.reset"""
         # hand_pos += 
         return self.m + self.sysnoise * np.random.randn(*self.m.shape)
 
     def step(self, x):
-        """update the robot, pointmass"""
+        """SimplearmSys.reset
+
+        update the robot, pointmass
+        """
         # print "%s.step x = %s" % (self.__class__.__name__, x)
         # print "x", x.shape
         # self.m = self.compute_motor_command(self.m + x)# .reshape((self.dim_s_motor, 1))
@@ -320,12 +333,15 @@ class SimplearmSys(SMPSys):
                 }
 
     def compute_sensors_extero(self):
+        """SimplearmSys.reset"""
+        # print "m.shape", self.m.shape, "lengths", self.lengths
         hand_pos = np.array(forward(self.m, self.lengths)).reshape((self.dim_s_extero, 1))
         hand_pos += self.sysnoise * np.random.randn(*hand_pos.shape)
         # print "hand_pos", hand_pos.shape
         return hand_pos
 
     def compute_sensors(self):
+        """SimplearmSys.reset"""
         """compute the proprio and extero sensor values from state"""
         # return np.vstack((self.m, self.compute_sensors_extero()))
         return np.vstack((self.compute_sensors_proprio(), self.compute_sensors_extero()))
