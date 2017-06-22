@@ -1,4 +1,4 @@
-"""smp_sys.bha_simulated.py
+"""smp_sys.systems_bhasim.py
 
 Python port of the Bionic Handling Assistant Matlab model
 

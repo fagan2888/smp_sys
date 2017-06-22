@@ -7,7 +7,7 @@ Submodules
 smp\_sys\.bha\_simulated module
 -------------------------------
 
-.. automodule:: smp_sys.bha_simulated
+.. automodule:: smp_sys.systems_bhasim
     :members:
     :undoc-members:
     :show-inheritance:
