@@ -25,7 +25,8 @@ from numpy import cos, sin, arctan2, pi
 
 import matplotlib.pyplot as plt
 #from matplotlib.patches import Circle, PathPatch
-from mpl_toolkits.mplot3d import Axes3D 
+# from mpl_toolkits.mplot3d import Axes3D 
+from mpl_toolkits.mplot3d import Axes3D
 #import mpl_toolkits.mplot3d.art3d as art3d
 
 #from goalBabbling import *
@@ -205,8 +206,10 @@ class BhaSimulatedSys(SMPSys):
         # return np.vstack((self.m, self.compute_sensors_extero()))
         prop = self.compute_sensors_proprio()
         exte = self.compute_sensors_extero()
-        print "prop", prop.shape, "exte", exte.shape
-        return np.hstack((prop, exte)).T
+        # print "prop", prop.shape, "exte", exte.shape
+        ret = np.hstack((prop, exte)).T
+        # print "ret", ret.shape
+        return ret
         # return self.x    
     
     def compute_sensori_effect(self,lens):
@@ -419,7 +422,7 @@ def main():
     # self.SegRadii = np.array([0.1,0.093,0.079])
     # bha = BhaSimulated(numSegs,SegRadii)
     # bha = BhaSimulated([-1] * 9, [1] * 9, [-1] * 9, [1] * 9, numSegs, SegRadii)
-    bha = BhaSimulated(conf = BhaSimulated.defaults)
+    bha = BhaSimulatedSys(conf = BhaSimulatedSys.defaults)
     
 
     # first home posture 
