@@ -1,16 +1,16 @@
 """smp_sys.systems_bhasim.py
 
-Python port of the Bionic Handling Assistant Matlab model
+Mathias Schmerling's Python port of the CoR-Lab's Matlab model of the Bionic Handling Assistant (BHA)
 
-Mathias Schmerling (BCCN Berlin, Adaptive Systems Group, HU Berlin)
-Oswald Berthold 2017
+.. moduleauthor:: Mathias Schmerling (BCCN Berlin, Adaptive Systems Group, HU Berlin), Oswald Berthold 2017
 
-Original Matlab code
+.. note::
+    Original Matlab code::
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%%%          Copyright (c) 2013 R. F. Reinhart, K. Neumann, A. Lemme CoR-Lab          %%%
-%%%          Bielefeld University, Germany, http://cor-lab.de                         %%%
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+    %%%          Copyright (c) 2013 R. F. Reinhart, K. Neumann, A. Lemme CoR-Lab          %%%
+    %%%          Bielefeld University, Germany, http://cor-lab.de                         %%%
+    %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 """
 
 # from explauto.environment.environment import Environment

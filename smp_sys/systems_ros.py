@@ -1,9 +1,25 @@
 """smp_sys
 
-ROS based systems: simulators and real robots
+ROS based systems, simulators and real robots
 
-stdr, lpzrobots, MORSE
-sphero, car, turtlebot, quad, puppy, nao
+These are different from simple systems such as a single python
+function in that they require interaction with the outside world.
+
+The basic pattern is that all system state variables are class members
+and the message callbacks write to these variables asynchronously,
+whenever they are called. The synchronous loop then just uses the
+current variable value.
+
+The step function
+ 1. takes the motor input from the outside
+ 2. sets the actual motor values applying scaling etc as required
+ 3. publishes the motor values via ROS
+ 4. sleeps for one rate cycle
+ 5. fetches the sensor feedback as the current value of corresponding
+    state variables and returns them
+
+ Simulators: Simple Two-Dimensional Robot Simulator (STDR), lpzrobots, MORSE, (Webots, Gazebo, ...)
+Real robots: Sphero, HUCar, Turtlebot, Quadrotor, Puppy, Nao
 """
 
 import time
@@ -11,21 +27,22 @@ import numpy as np
 from collections import OrderedDict
 
 # ROS imports
-from std_msgs.msg      import Float64MultiArray, Float32MultiArray
-
-from nav_msgs.msg      import Odometry
-from geometry_msgs.msg import Twist
-from sensor_msgs.msg   import Range
-
 try:
     import rospy
     from tf.transformations import euler_from_quaternion, quaternion_from_euler
 except Exception, e:
     print "Import rospy failed with %s" % (e, )
 
+from std_msgs.msg      import Float64MultiArray, Float32MultiArray
+from std_msgs.msg      import Float32, ColorRGBA
 
+from nav_msgs.msg      import Odometry
+from geometry_msgs.msg import Twist, Quaternion #, Point, Pose, TwistWithCovariance, Vector3
+from sensor_msgs.msg   import Range
+from sensor_msgs.msg   import Imu
+
+# smpsys base class
 from smp_sys.systems import SMPSys
-
 
 class STDRCircularSys(SMPSys):
 
@@ -269,6 +286,173 @@ class LPZBarrelSys(SMPSys):
             's_proprio': self.prepare_inputs(),
             's_extero' : np.zeros((1,1))
             }
+
+# class robotSphero(robot): from smp_sphero/hk2.py
+class SpheroSys(SMPSys):
+    """SpheroSys
+
+    Sphero ROS based system
+
+    FIXME: control modes
+    """
+    defaults = {
+        'ros': True,
+        'dt': 0.05,
+        'dim_s_proprio': 2, # linear, angular
+        'dim_s_extero': 1,
+        'outdict': {},
+        'control': 'twist',
+    }
+
+    # def __init__(self, ref):
+    #     robot.__init__(self, ref)
+    def __init__(self, conf = {}):
+        """SpheroSys.__init__
+
+        Arguments:
+        - conf: configuration dictionary
+        -- mass: point _mass_
+        -- sysdim: dimension of system, usually 1,2, or 3D
+        -- statedim: 1d pointmass has 3 variables (pos, vel, acc) in this model, so sysdim * 3
+        -- dt: integration time step
+        -- x0: initial state
+        -- order: NOT IMPLEMENT (control mode of the system, order = 0 kinematic, 1 velocity, 2 force)
+        """
+        SMPSys.__init__(self, conf)
+        
+        # state is (pos, vel, acc).T
+        # self.state_dim
+        if not hasattr(self, 'x0'):
+            self.x0 = np.zeros((self.dim_s_proprio, 1))
+        self.x  = self.x0.copy()
+        self.cnt = 0
+
+        if not self.ros:
+            import sys
+            print "ROS not configured but this robot (%s) requires ROS, exiting" % (self.__class__.__name__)
+            sys.exit(1)
+
+        # self.pubs = {
+        #     'motors': rospy.Publisher(
+        #         "/lpzbarrel/motors", Float64MultiArray, queue_size = 2),
+        #     'sensors': rospy.Publisher(
+        #         "/lpzbarrel/x", Float32MultiArray, queue_size = 2)
+        #     }
+        # self.subs = {
+        #     'sensors': rospy.Subscriber("/lpzbarrel/sensors", Float64MultiArray, self.cb_sensors),
+        # }
+        
+        self.pubs = {
+            '_cmd_vel':     rospy.Publisher("/cmd_vel",     Twist, queue_size = 2),
+            '_cmd_vel_raw': rospy.Publisher("/cmd_vel_raw", Twist, queue_size = 2),
+            '_set_color':   rospy.Publisher("/set_color",   ColorRGBA, queue_size = 2),
+            '_lpzros_x':    rospy.Publisher("/lpzros/x",    Float32MultiArray, queue_size = 2)
+            }
+        # self.cb = {
+        #     "/imu": get_cb_dict(self.cb_imu),
+        #     "/odom": get_cb_dict(self.cb_odom),
+        #     }
+        
+        self.subs = {
+            'imu':  rospy.Subscriber("/imu", Imu, self.cb_imu),
+            'odom': rospy.Subscriber("/odom", Odometry, self.cb_odom),
+            }
+
+        # timing
+        self.rate = rospy.Rate(1/self.dt)
+
+        self.cb_imu_cnt  = 0
+        self.cb_odom_cnt = 0
+        
+        # custom
+        self.numsen_raw = 10 # 8 # 5 # 2
+        self.numsen     = 10 # 8 # 5 # 2
+        
+        self.imu  = Imu()
+        self.odom = Odometry()
+        # sphero color
+        self.color = ColorRGBA()
+        self.motors = Twist()
+        
+        self.msg_inputs     = Float32MultiArray()
+        self.msg_motors     = Float64MultiArray()
+        self.msg_sensor_exp = Float64MultiArray()
+
+        self.imu_lin_acc_gain = 0 # 1e-1
+        self.imu_gyrosco_gain = 1e-1
+        self.imu_orienta_gain = 0 # 1e-1
+        self.linear_gain      = 0 # 1.0 # 1e-1
+        self.pos_gain         = 0 # 1e-2
+        self.output_gain = 255 # 120 # 120
+        
+        # sphero lag is 4 timesteps
+        self.lag = 1 # 2
+        
+    def cb_imu(self, msg):
+        """SpheroSys.cb_imu
+
+        ROS IMU sensor callback: use odometry and incoming imu data to trigger
+        sensorimotor loop execution
+        """
+        # FIXME: do the averaging here
+        self.imu = msg
+        imu_vec_acc = np.array((self.imu.linear_acceleration.x, self.imu.linear_acceleration.y, self.imu.linear_acceleration.z))
+        imu_vec_gyr = np.array((self.imu.angular_velocity.x, self.imu.angular_velocity.y, self.imu.angular_velocity.z))
+        (r, p, y) = tf.transformations.euler_from_quaternion([self.imu.orientation.x, self.imu.orientation.y, self.imu.orientation.z, self.imu.orientation.w])
+        imu_vec_ori = np.array((r, p, y))
+        imu_vec_ = np.hstack((imu_vec_acc, imu_vec_gyr, imu_vec_ori)).reshape(self.imu_vec.shape)
+        self.imu_vec = self.imu_vec * self.imu_smooth + (1 - self.imu_smooth) * imu_vec_
+        # print "self.imu_vec", self.imu_vec
+
+        self.cb_imu_cnt += 1
+        
+    def cb_odom(self, msg):
+        """ROS odometry callback, copy incoming data into local memory"""
+        # print type(msg)
+        self.odom = msg        
+        self.cb_odom_cnt += 1
+
+    def prepare_inputs_all(self):
+        inputs = (self.odom.twist.twist.linear.x * self.linear_gain, self.odom.twist.twist.linear.y * self.linear_gain,
+                         self.imu_vec[0] * self.imu_lin_acc_gain,
+                         self.imu_vec[1] * self.imu_lin_acc_gain,
+                         self.imu_vec[2] * self.imu_lin_acc_gain,
+                         self.imu_vec[3] * self.imu_gyrosco_gain,
+                         self.imu_vec[4] * self.imu_gyrosco_gain,
+                         self.imu_vec[5] * self.imu_gyrosco_gain,
+                         self.odom.pose.pose.position.x * self.pos_gain,
+                         self.odom.pose.pose.position.y * self.pos_gain,
+                         )
+        print "%s.prepare_inputs_all inputs = %s" % (self.__class__.__name__, inputs)
+        return np.array([inputs])
+
+    def prepare_inputs(self):
+        inputs = (self.odom.twist.twist.linear.x * self.linear_gain, self.odom.twist.twist.linear.y * self.linear_gain)
+        print "%s.prepare_inputs inputs = %s" % (self.__class__.__name__, inputs)
+        return np.array([inputs])
+
+    def prepare_output(self, y):
+        # self.motors.linear.x = y[0,0] * self.output_gain
+        # self.motors.linear.y = y[1,0] * self.output_gain
+        # self.pub["_cmd_vel"].publish(self.motors)
+        self.motors.linear.x  = y[1,0] * self.output_gain * 1.414 # ?
+        self.motors.angular.z = y[0,0] * 1 # self.output_gain
+
+    def step(self, x):
+        print "x", x
+        # x_ = self.prepare_inputs()
+
+        self.prepare_output(x)
+        
+        self.pubs["_cmd_vel_raw"].publish(self.motors)
+        print "%s.prepare_output y = %s , motors = %s" % (y, self.motors)
+
+        self.rate.sleep()
+        
+        return {
+            's_proprio': self.prepare_inputs(),
+            's_extero' : np.zeros((1,1))
+            }
         
 if __name__ == "__main__":
     import argparse
@@ -283,6 +467,8 @@ if __name__ == "__main__":
         syscls = STDRCircularSys
     elif args.system == "lpzbarrel":
         syscls = LPZBarrelSys
+    elif args.system == "sphero":
+        syscls = SpheroSys
         
     # get default conf
     r_conf = syscls.defaults

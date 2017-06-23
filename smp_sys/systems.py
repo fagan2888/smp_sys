@@ -46,7 +46,30 @@ motors, things that can move or somehow do stuff in any kind of world.
 import numpy as np
 
 class SMPSys(object):
+    """SMPSys
+
+    Basic smp system class
+
+    :param dict conf: a configuration dictionary
+
+    Takes the config dict and copies all items to corresponding class members
+    Checks for presence of ROS libraries
+    Initializes pubs/subs dictionaries
+    """
     def __init__(self, conf = {}):
+        """SMPSys.__init__
+
+        Basic smp system class init
+
+        Arguments:
+
+        - conf: a configuration dictionary
+
+        Takes the config dict and copies all items to corresponding class members
+        Checks for presence of ROS libraries
+        Initializes pubs/subs dictionaries
+        """
+
         self.conf = conf
         # set_attr_from_dict(self, conf) # check that this is OK
 
@@ -67,6 +90,18 @@ class SMPSys(object):
             self.pubs = {}
             
     def step(self, x):
+        """SMPSys.step
+
+        Basic smp system class step function
+
+        :param numpy.ndarray x: the input column vector
+
+        Does nothing.
+        
+
+
+        :returns: None
+        """
         return None
     
 ################################################################################
