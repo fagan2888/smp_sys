@@ -10,6 +10,13 @@ import time
 import numpy as np
 from collections import OrderedDict
 
+# ROS imports
+from std_msgs.msg      import Float64MultiArray, Float32MultiArray
+
+from nav_msgs.msg      import Odometry
+from geometry_msgs.msg import Twist
+from sensor_msgs.msg   import Range
+
 try:
     import rospy
     from tf.transformations import euler_from_quaternion, quaternion_from_euler
@@ -61,9 +68,6 @@ class STDRCircularSys(SMPSys):
         self.rate = rospy.Rate(1/self.dt)
             
         # pub / sub
-        from nav_msgs.msg      import Odometry
-        from geometry_msgs.msg import Twist
-        from sensor_msgs.msg   import Range
 
         # actuator / motors
         self.twist = Twist()
@@ -207,16 +211,16 @@ class LPZBarrelSys(SMPSys):
                 "/lpzbarrel/x", Float32MultiArray, queue_size = 2)
             }
         self.subs = {
-            "/lpzbarrel/sensors": [Float64MultiArray, self.cb_sensors],
+            'sensors': rospy.Subscriber("/lpzbarrel/sensors", Float64MultiArray, self.cb_sensors),
         }
         
         self.numsen_raw = 2
         self.numsen     = 2
         self.nummot     = 2
         self.sensors = Float64MultiArray()
-        self.sensors.data = [0 for i in range(self.numsen_raw)]
+        self.sensors.data = [0.0 for i in range(self.numsen_raw)]
         self.motors  = Float64MultiArray()
-        self.motors.data = [0 for i in range(self.nummot)]
+        self.motors.data = [0.0 for i in range(self.nummot)]
         self.lag = 2
             
         # timing
@@ -229,12 +233,15 @@ class LPZBarrelSys(SMPSys):
         # self.smdict["s_extero"] = np.zeros((self.dim_s_extero, 1))
 
     def cb_sensors(self, msg):
+        # print "%s.cb_sensors msg = %s" % (self.__class__.__name__, msg)
         self.sensors = msg
 
     def prepare_inputs(self):
-        inputs = np.array(self.sensors.data)
-        print "%s.prepare_inputs inputs = %s" % (self.__class__.__name__, inputs)
-        return inputs
+        sdata = self.sensors.data
+        print "%s.prepare_inputs sdata = %s" % (self.__class__.__name__, type(sdata))
+        inputs = np.array([sdata])
+        print "%s.prepare_inputs inputs = %s" % (self.__class__.__name__, inputs.shape)
+        return inputs.T
 
     def prepare_output(self, y):
         self.motors.data = y
@@ -247,7 +254,9 @@ class LPZBarrelSys(SMPSys):
     
     def step(self, x):
         if rospy.is_shutdown(): return
-        self.motors.data = x
+        print "%s.step x = %s %s, motor data = %s" % (self.__class__.__name__, x.dtype, x.flatten().tolist(), type(self.motors.data))
+
+        self.motors.data = x.flatten().tolist()
             
         self.pubs["motors"].publish(self.motors)
 
