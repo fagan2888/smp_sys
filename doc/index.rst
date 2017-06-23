@@ -9,6 +9,7 @@ Welcome to smp_sys's documentation!
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
+
    apidoc/modules
 
 ..

@@ -1,4 +1,6 @@
-"""smp_sys
+"""**smp_sys.systems_ros.py**
+
+.. moduleauthor:: Oswald Berthold, 2017
 
 ROS based systems, simulators and real robots
 
@@ -18,7 +20,8 @@ The step function
  5. fetches the sensor feedback as the current value of corresponding
     state variables and returns them
 
- Simulators: Simple Two-Dimensional Robot Simulator (STDR), lpzrobots, MORSE, (Webots, Gazebo, ...)
+Simulators: Simple Two-Dimensional Robot Simulator (STDR), lpzrobots, MORSE, (Webots, Gazebo, ...)
+
 Real robots: Sphero, HUCar, Turtlebot, Quadrotor, Puppy, Nao
 """
 
@@ -40,6 +43,8 @@ from nav_msgs.msg      import Odometry
 from geometry_msgs.msg import Twist, Quaternion #, Point, Pose, TwistWithCovariance, Vector3
 from sensor_msgs.msg   import Range
 from sensor_msgs.msg   import Imu
+
+import tf
 
 # smpsys base class
 from smp_sys.systems import SMPSys
@@ -378,10 +383,13 @@ class SpheroSys(SMPSys):
         self.msg_motors     = Float64MultiArray()
         self.msg_sensor_exp = Float64MultiArray()
 
+        self.imu_vec  = np.zeros((3 + 3 + 3, 1))
+        self.imu_smooth = 0.8 # coef
+        
         self.imu_lin_acc_gain = 0 # 1e-1
         self.imu_gyrosco_gain = 1e-1
         self.imu_orienta_gain = 0 # 1e-1
-        self.linear_gain      = 0 # 1.0 # 1e-1
+        self.linear_gain      = 1.0 # 1e-1
         self.pos_gain         = 0 # 1e-2
         self.output_gain = 255 # 120 # 120
         
@@ -394,6 +402,7 @@ class SpheroSys(SMPSys):
         ROS IMU sensor callback: use odometry and incoming imu data to trigger
         sensorimotor loop execution
         """
+        print "msg", msg
         # FIXME: do the averaging here
         self.imu = msg
         imu_vec_acc = np.array((self.imu.linear_acceleration.x, self.imu.linear_acceleration.y, self.imu.linear_acceleration.z))
@@ -408,7 +417,7 @@ class SpheroSys(SMPSys):
         
     def cb_odom(self, msg):
         """ROS odometry callback, copy incoming data into local memory"""
-        # print type(msg)
+        # print "type(msg)", type(msg)
         self.odom = msg        
         self.cb_odom_cnt += 1
 
@@ -427,7 +436,9 @@ class SpheroSys(SMPSys):
         return np.array([inputs])
 
     def prepare_inputs(self):
-        inputs = (self.odom.twist.twist.linear.x * self.linear_gain, self.odom.twist.twist.linear.y * self.linear_gain)
+        print "self.odom", self.odom
+        inputs = (self.odom.twist.twist.linear.x * self.linear_gain, self.odom.twist.twist.linear.y * self.linear_gain)        
+        # inputs = (self.odom.twist.twist.linear.x * self.linear_gain, self.odom.twist.twist.angular.z)
         print "%s.prepare_inputs inputs = %s" % (self.__class__.__name__, inputs)
         return np.array([inputs])
 
@@ -445,7 +456,7 @@ class SpheroSys(SMPSys):
         self.prepare_output(x)
         
         self.pubs["_cmd_vel_raw"].publish(self.motors)
-        print "%s.prepare_output y = %s , motors = %s" % (y, self.motors)
+        # print "%s.prepare_output y = %s , motors = %s" % (self.__class__.__name__, x, self.motors)
 
         self.rate.sleep()
         
@@ -479,10 +490,25 @@ if __name__ == "__main__":
     print "%s robot = %s" % (args.system, r)
 
     # run a couple of steps
+    numsteps = 100
     i = 0
-    while not rospy.is_shutdown() and i < 100:
+    x = np.zeros((r.dim_s_proprio, numsteps))
+    y = np.zeros((r.dim_s_proprio, numsteps))
+    
+    while not rospy.is_shutdown() and i < numsteps:
         # rospy.spin()
-        x = r.step(np.random.uniform(-.3, .3, (r.dim_s_proprio, 1)))
+        y[...,[i]] = np.random.uniform(-.3, .3, (r.dim_s_proprio, 1))
+        x_ = r.step(y[...,[i]])
+        print x_
+        x[...,[i]] = x_['s_proprio'].T.copy()
         # r.rate.sleep()
-        print "step[%d] output = %s" % (i, x)
+        # print "step[%d] output = %s" % (i, x)
         i += 1
+
+    import matplotlib.pyplot as plt
+    fig = plt.figure()
+    ax = fig.add_subplot(2,1,1)
+    ax.plot(y.T)
+    ax = fig.add_subplot(2,1,2)
+    ax.plot(x.T)
+    plt.show()

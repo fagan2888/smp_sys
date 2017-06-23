@@ -1,4 +1,4 @@
-"""smp systems
+"""**smp_sys.systems**
 
 A system in the smp framework is any thing that can be packed into a
 box with inputs and outputs and some kind of internal activity that
@@ -107,11 +107,27 @@ class SMPSys(object):
 ################################################################################
 # point mass system
 class PointmassSys(SMPSys):
-    """point mass system (pm)
+    """PointmassSys
 
-    a pm is an abstract model of a rigid body robot represented by the coordinates 
+    A point mass system (pm), which is an abstract model of a rigid
+    body robot in an n-dimensional isotropic space. The robot's state
+    :math:`x = (x_a, x_v, x_p)^T \in \mathcal{R}^{3 n}` with
 
-    taken from smq/robots.py, seems to be the same code as in explauto/environments/pointmass.py
+    .. math::
+
+        \\begin{eqnarray}
+            x_a & := & \\text{acceleration} \\\\
+            x_v & := & \\text{velocity} \\\\
+            x_p & := & \\text{position} \\\\
+        \\end{eqnarray}
+
+
+    Taken from `smq/robots
+    <https://github.com/x75/smq/blob/master/smq/robots.py>`_, and it
+    seems to be the same code as in `explauto/environments/pointmass
+    <https://github.com/x75/explauto/blob/smp/explauto/environment/pointmass/pointmass.py>`_.
+
+    Missing: noise, motor aberration, transfer funcs, ...
     """
     defaults = {
         'sysdim': 1,
