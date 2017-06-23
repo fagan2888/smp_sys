@@ -171,7 +171,7 @@ class LPZBarrelSys(SMPSys):
     """LPZBarrelSys"""
     defaults = {
         'ros': True,
-        'dt': 0.1,
+        'dt': 0.01,
         'dim_s_proprio': 2, # w1, w2
         'dim_s_extero': 1,
         'outdict': {},
@@ -271,22 +271,32 @@ class LPZBarrelSys(SMPSys):
             }
         
 if __name__ == "__main__":
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-s", "--system", type = str, default = "stdr", help = "Which system to test [stdr] from stdr, lpzbarrel, ...")
+    args = parser.parse_args()
+    
     # init node
     n = rospy.init_node("smp_sys_systems_ros")
 
+    if args.system == "stdr":
+        syscls = STDRCircularSys
+    elif args.system == "lpzbarrel":
+        syscls = LPZBarrelSys
+        
     # get default conf
-    r_conf = STDRCircularSys.defaults
+    r_conf = syscls.defaults
 
     # init sys
-    r = STDRCircularSys(conf = r_conf)
+    r = syscls(conf = r_conf)
 
-    print "STDR robot", r
+    print "%s robot = %s" % (args.system, r)
 
     # run a couple of steps
     i = 0
     while not rospy.is_shutdown() and i < 100:
         # rospy.spin()
-        r.step(np.random.uniform(-.3, .3, (2, 1)))
+        x = r.step(np.random.uniform(-.3, .3, (r.dim_s_proprio, 1)))
         # r.rate.sleep()
-        print "step output value[%d] = %s" % (i, r.outdict)
+        print "step[%d] output = %s" % (i, x)
         i += 1
