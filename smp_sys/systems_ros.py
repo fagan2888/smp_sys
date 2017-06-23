@@ -299,6 +299,10 @@ class SpheroSys(SMPSys):
     Sphero ROS based system
 
     FIXME: control modes
+
+    Start the sphero ROS driver with
+
+    `python src/sphero_ros/sphero_node/nodes/sphero.py --freq 20 --target_addr 00:11:22:33:44:55`
     """
     defaults = {
         'ros': True,
@@ -350,6 +354,7 @@ class SpheroSys(SMPSys):
         self.pubs = {
             '_cmd_vel':     rospy.Publisher("/cmd_vel",     Twist, queue_size = 2),
             '_cmd_vel_raw': rospy.Publisher("/cmd_vel_raw", Twist, queue_size = 2),
+            '_cmd_raw_motors': rospy.Publisher("/cmd_raw_motors", Float32MultiArray, queue_size = 2),
             '_set_color':   rospy.Publisher("/set_color",   ColorRGBA, queue_size = 2),
             '_lpzros_x':    rospy.Publisher("/lpzros/x",    Float32MultiArray, queue_size = 2)
             }
@@ -378,6 +383,8 @@ class SpheroSys(SMPSys):
         # sphero color
         self.color = ColorRGBA()
         self.motors = Twist()
+        self.raw_motors = Float32MultiArray()
+        self.raw_motors.data = [0.0 for i in range(4)]
         
         self.msg_inputs     = Float32MultiArray()
         self.msg_motors     = Float64MultiArray()
@@ -448,14 +455,24 @@ class SpheroSys(SMPSys):
         # self.pub["_cmd_vel"].publish(self.motors)
         self.motors.linear.x  = y[1,0] * self.output_gain * 1.414 # ?
         self.motors.angular.z = y[0,0] * 1 # self.output_gain
+        
+    def prepare_output_raw_motors(self, y):
+        # tmp = y.flatten().tolist()
+
+        self.raw_motors.data[0] = int(np.sign(y[0,0]) * 0.5 + 1.5)
+        self.raw_motors.data[1] = int(np.abs(y[0,0]) * 100 + 60)
+        self.raw_motors.data[2] = int(np.sign(y[1,0]) * 0.5 + 1.5)
+        self.raw_motors.data[3] = int(np.abs(y[1,0]) * 100 + 60)
 
     def step(self, x):
         print "x", x
         # x_ = self.prepare_inputs()
 
-        self.prepare_output(x)
+        # self.prepare_output(x)
+        # self.pubs["_cmd_vel_raw"].publish(self.motors)
         
-        self.pubs["_cmd_vel_raw"].publish(self.motors)
+        self.prepare_output_raw_motors(x)
+        self.pubs["_cmd_raw_motors"].publish(self.raw_motors)
         # print "%s.prepare_output y = %s , motors = %s" % (self.__class__.__name__, x, self.motors)
 
         self.rate.sleep()
@@ -468,6 +485,7 @@ class SpheroSys(SMPSys):
 if __name__ == "__main__":
     import argparse
     parser = argparse.ArgumentParser()
+    parser.add_argument("-n", "--numsteps", type = int, default = 100, help = "Number of steps [100]")
     parser.add_argument("-s", "--system", type = str, default = "stdr", help = "Which system to test [stdr] from stdr, lpzbarrel, ...")
     args = parser.parse_args()
     
@@ -490,19 +508,20 @@ if __name__ == "__main__":
     print "%s robot = %s" % (args.system, r)
 
     # run a couple of steps
-    numsteps = 100
+    numsteps = args.numsteps
     i = 0
     x = np.zeros((r.dim_s_proprio, numsteps))
     y = np.zeros((r.dim_s_proprio, numsteps))
     
     while not rospy.is_shutdown() and i < numsteps:
         # rospy.spin()
-        y[...,[i]] = np.random.uniform(-.3, .3, (r.dim_s_proprio, 1))
+        # y[...,[i]] = np.random.uniform(-.3, .3, (r.dim_s_proprio, 1))
+        y[...,[i]] = np.sin(np.ones((r.dim_s_proprio, 1)) * np.arange(1, r.dim_s_proprio) * i * 0.01)
         x_ = r.step(y[...,[i]])
         print x_
         x[...,[i]] = x_['s_proprio'].T.copy()
         # r.rate.sleep()
-        # print "step[%d] output = %s" % (i, x)
+        print "step[%d] input = %s, output = %s" % (i, y, x)
         i += 1
 
     import matplotlib.pyplot as plt
