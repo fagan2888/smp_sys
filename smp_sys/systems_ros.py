@@ -519,7 +519,7 @@ if __name__ == "__main__":
         y[...,[i]] = np.sin(np.ones((r.dim_s_proprio, 1)) * np.arange(1, r.dim_s_proprio) * i * 0.01)
         x_ = r.step(y[...,[i]])
         print x_
-        x[...,[i]] = x_['s_proprio'].T.copy()
+        x[...,[i]] = x_['s_proprio'].copy()
         # r.rate.sleep()
         print "step[%d] input = %s, output = %s" % (i, y, x)
         i += 1
