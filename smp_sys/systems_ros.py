@@ -255,28 +255,36 @@ class LPZBarrelSys(SMPSys):
         # self.smdict["s_extero"] = np.zeros((self.dim_s_extero, 1))
 
     def cb_sensors(self, msg):
+        """LPZBarrelSys.cb_sensors
+
+        Sensors ROS callback
+        """
         # print "%s.cb_sensors msg = %s" % (self.__class__.__name__, msg)
         self.sensors = msg
 
     def prepare_inputs(self):
+        """LPZBarrelSys.prepare_inputs"""
         sdata = self.sensors.data
-        print "%s.prepare_inputs sdata = %s" % (self.__class__.__name__, type(sdata))
+        # print "%s.prepare_inputs sdata = %s" % (self.__class__.__name__, type(sdata))
         inputs = np.array([sdata])
-        print "%s.prepare_inputs inputs = %s" % (self.__class__.__name__, inputs.shape)
+        # print "%s.prepare_inputs inputs = %s" % (self.__class__.__name__, inputs.shape)
         return inputs.T
 
     def prepare_output(self, y):
+        """LPZBarrelSys.prepare_output"""
         self.motors.data = y
         # print "self.pubs", self.pubs
         self.ref.pub["_motors"].publish(self.motors)
         
     def reset(self):
+        """LPZBarrelSys.reset"""
         # initialize / reset
         return None
     
     def step(self, x):
+        """LPZBarrelSys.step"""
         if rospy.is_shutdown(): return
-        print "%s.step x = %s %s, motor data = %s" % (self.__class__.__name__, x.dtype, x.flatten().tolist(), type(self.motors.data))
+        # print "%s.step x = %s %s, motor data = %s" % (self.__class__.__name__, x.dtype, x.flatten().tolist(), type(self.motors.data))
 
         self.motors.data = x.flatten().tolist()
             
@@ -423,12 +431,16 @@ class SpheroSys(SMPSys):
         self.cb_imu_cnt += 1
         
     def cb_odom(self, msg):
-        """ROS odometry callback, copy incoming data into local memory"""
+        """SpheroSys.cb_odom
+
+        ROS odometry callback, copy incoming data into local memory
+        """
         # print "type(msg)", type(msg)
         self.odom = msg        
         self.cb_odom_cnt += 1
 
     def prepare_inputs_all(self):
+        """SpheroSys.prepare_inputs_all"""
         inputs = (self.odom.twist.twist.linear.x * self.linear_gain, self.odom.twist.twist.linear.y * self.linear_gain,
                          self.imu_vec[0] * self.imu_lin_acc_gain,
                          self.imu_vec[1] * self.imu_lin_acc_gain,
@@ -443,6 +455,7 @@ class SpheroSys(SMPSys):
         return np.array([inputs])
 
     def prepare_inputs(self):
+        """SpheroSys.prepare_inputs"""
         print "self.odom", self.odom
         inputs = (self.odom.twist.twist.linear.x * self.linear_gain, self.odom.twist.twist.linear.y * self.linear_gain)        
         # inputs = (self.odom.twist.twist.linear.x * self.linear_gain, self.odom.twist.twist.angular.z)
@@ -450,6 +463,7 @@ class SpheroSys(SMPSys):
         return np.array([inputs])
 
     def prepare_output(self, y):
+        """SpheroSys.prepare_output"""
         # self.motors.linear.x = y[0,0] * self.output_gain
         # self.motors.linear.y = y[1,0] * self.output_gain
         # self.pub["_cmd_vel"].publish(self.motors)
@@ -457,6 +471,7 @@ class SpheroSys(SMPSys):
         self.motors.angular.z = y[0,0] * 1 # self.output_gain
         
     def prepare_output_raw_motors(self, y):
+        """SpheroSys.prepare_output_raw_motors"""
         # tmp = y.flatten().tolist()
 
         self.raw_motors.data[0] = int(np.sign(y[0,0]) * 0.5 + 1.5)
@@ -465,6 +480,7 @@ class SpheroSys(SMPSys):
         self.raw_motors.data[3] = int(np.abs(y[1,0]) * 100 + 60)
 
     def step(self, x):
+        """SpheroSys.step"""
         print "x", x
         # x_ = self.prepare_inputs()
 
