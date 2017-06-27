@@ -241,6 +241,7 @@ class LPZBarrelSys(SMPSys):
         self.nummot     = 2
         self.sensors = Float64MultiArray()
         self.sensors.data = [0.0 for i in range(self.numsen_raw)]
+        self.sensors_raw  = np.array([self.sensors.data])
         self.motors  = Float64MultiArray()
         self.motors.data = [0.0 for i in range(self.nummot)]
         self.lag = 2
@@ -261,12 +262,14 @@ class LPZBarrelSys(SMPSys):
         """
         # print "%s.cb_sensors msg = %s" % (self.__class__.__name__, msg)
         self.sensors = msg
+        self.sensors_raw  = 0.8 * self.sensors_raw + 0.2 * np.array(self.sensors.data)
 
     def prepare_inputs(self):
         """LPZBarrelSys.prepare_inputs"""
         sdata = self.sensors.data
         # print "%s.prepare_inputs sdata = %s" % (self.__class__.__name__, type(sdata))
         inputs = np.array([sdata])
+        # inputs = self.sensors_raw
         # print "%s.prepare_inputs inputs = %s" % (self.__class__.__name__, inputs.shape)
         return inputs.T
 
