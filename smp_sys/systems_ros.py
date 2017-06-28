@@ -37,7 +37,7 @@ except Exception, e:
     print "Import rospy failed with %s" % (e, )
 
 from std_msgs.msg      import Float64MultiArray, Float32MultiArray
-from std_msgs.msg      import Float32, ColorRGBA
+from std_msgs.msg      import Float32, ColorRGBA, Bool
 
 from nav_msgs.msg      import Odometry
 from geometry_msgs.msg import Twist, Quaternion #, Point, Pose, TwistWithCovariance, Vector3
@@ -61,7 +61,7 @@ class STDRCircularSys(SMPSys):
         }
     
     def __init__(self, conf = {}):
-        """Pointmass.__init__
+        """STDRCircularSys.__init__
 
         Arguments:
         - conf: configuration dictionary
@@ -121,6 +121,7 @@ class STDRCircularSys(SMPSys):
         self.smdict["s_extero"] = np.zeros((self.dim_s_extero, 1))
 
     def reset(self):
+        """STDRCircularSys.reset"""
         # initialize / reset
         from stdr_msgs.srv import MoveRobot
         from geometry_msgs.msg import Pose2D
@@ -132,6 +133,7 @@ class STDRCircularSys(SMPSys):
         # print "ret", ret
         
     def step(self, x):
+        """STDRCircularSys.step"""
         if rospy.is_shutdown(): return
         self.twist.linear.x = x[0,0]  # np.random.uniform(0, 1)
         self.twist.angular.z = x[1,0] * 1.0 # np.random.uniform(-1, 1)
@@ -157,6 +159,7 @@ class STDRCircularSys(SMPSys):
         return self.outdict
         
     def cb_odom(self, msg):
+        """STDRCircularSys"""
         # print "%s.cb_odom" % (self.__class__.__name__), type(msg)
         self.odom = msg
 
@@ -175,6 +178,7 @@ class STDRCircularSys(SMPSys):
         # self.smdict["s_extero"][self.get_sm_index("s_extero", "theta", 1)] = euler_angles[2]
         
     def cb_range(self, msg):
+        """STDRCircularSys"""
         # print "%s.cb_range" % (self.__class__.__name__), type(msg)
         # print "id", msg.header.frame_id
         sonar_idx = int(msg.header.frame_id.split("_")[-1])
@@ -367,7 +371,8 @@ class SpheroSys(SMPSys):
             '_cmd_vel_raw': rospy.Publisher("/cmd_vel_raw", Twist, queue_size = 2),
             '_cmd_raw_motors': rospy.Publisher("/cmd_raw_motors", Float32MultiArray, queue_size = 2),
             '_set_color':   rospy.Publisher("/set_color",   ColorRGBA, queue_size = 2),
-            '_lpzros_x':    rospy.Publisher("/lpzros/x",    Float32MultiArray, queue_size = 2)
+            '_lpzros_x':    rospy.Publisher("/lpzros/x",    Float32MultiArray, queue_size = 2),
+            '_set_stab':    rospy.Publisher('disable_stabilization', Bool, queue_size = 2),
             }
         # self.cb = {
         #     "/imu": get_cb_dict(self.cb_imu),
@@ -376,7 +381,7 @@ class SpheroSys(SMPSys):
         
         self.subs = {
             'imu':  rospy.Subscriber("/imu", Imu, self.cb_imu),
-            'odom': rospy.Subscriber("/odom", Odometry, self.cb_odom),
+            'odom': rospy.Subscriber("/odom", Odometry, self.cb_odom),            
             }
 
         # timing
@@ -409,10 +414,18 @@ class SpheroSys(SMPSys):
         self.imu_orienta_gain = 0 # 1e-1
         self.linear_gain      = 1.0 # 1e-1
         self.pos_gain         = 0 # 1e-2
+        self.angular_gain     = 360.0 # 1e-1
         self.output_gain = 255 # 120 # 120
         
         # sphero lag is 4 timesteps
         self.lag = 1 # 2
+
+        # enable stabilization
+        stab = Bool()
+        stab.data = False
+        print "stab", stab, stab.data
+        for i in range(5):
+            self.pubs['_set_stab'].publish(stab)
         
     def cb_imu(self, msg):
         """SpheroSys.cb_imu
@@ -420,7 +433,7 @@ class SpheroSys(SMPSys):
         ROS IMU sensor callback: use odometry and incoming imu data to trigger
         sensorimotor loop execution
         """
-        print "msg", msg
+        # print "msg", msg
         # FIXME: do the averaging here
         self.imu = msg
         imu_vec_acc = np.array((self.imu.linear_acceleration.x, self.imu.linear_acceleration.y, self.imu.linear_acceleration.z))
@@ -439,6 +452,7 @@ class SpheroSys(SMPSys):
         ROS odometry callback, copy incoming data into local memory
         """
         # print "type(msg)", type(msg)
+        # print "msg.twist.twist", msg.twist.twist
         self.odom = msg        
         self.cb_odom_cnt += 1
 
@@ -459,19 +473,25 @@ class SpheroSys(SMPSys):
 
     def prepare_inputs(self):
         """SpheroSys.prepare_inputs"""
-        print "self.odom", self.odom
-        inputs = (self.odom.twist.twist.linear.x * self.linear_gain, self.odom.twist.twist.linear.y * self.linear_gain)        
-        # inputs = (self.odom.twist.twist.linear.x * self.linear_gain, self.odom.twist.twist.angular.z)
+        # print "self.odom", self.odom
+        inputs = (self.odom.twist.twist.linear.x * self.linear_gain, self.odom.twist.twist.linear.y * self.linear_gain)
+        # inputs = (self.odom.twist.twist.linear.x * self.linear_gain, self.odom.twist.twist.angular.z * self.angular_gain)
         print "%s.prepare_inputs inputs = %s" % (self.__class__.__name__, inputs)
         return np.array([inputs])
 
     def prepare_output(self, y):
         """SpheroSys.prepare_output"""
-        # self.motors.linear.x = y[0,0] * self.output_gain
-        # self.motors.linear.y = y[1,0] * self.output_gain
-        # self.pub["_cmd_vel"].publish(self.motors)
+        self.motors.linear.x = y[0,0] * self.output_gain
+        self.motors.linear.y = y[1,0] * self.output_gain
+        self.pubs["_cmd_vel"].publish(self.motors)
+        print "%s.prepare_output y = %s , motors = %s" % (self.__class__.__name__, y, self.motors)
+
+    def prepare_output_vel_raw(self, y):
+        """SpheroSys.prepare_output_vel_raw"""
         self.motors.linear.x  = y[1,0] * self.output_gain * 1.414 # ?
         self.motors.angular.z = y[0,0] * 1 # self.output_gain
+        self.pubs["_cmd_vel_raw"].publish(self.motors)
+        print "%s.prepare_output_vel_raw y = %s , motors = %s" % (self.__class__.__name__, y, self.motors)
         
     def prepare_output_raw_motors(self, y):
         """SpheroSys.prepare_output_raw_motors"""
@@ -481,18 +501,17 @@ class SpheroSys(SMPSys):
         self.raw_motors.data[1] = int(np.abs(y[0,0]) * 100 + 60)
         self.raw_motors.data[2] = int(np.sign(y[1,0]) * 0.5 + 1.5)
         self.raw_motors.data[3] = int(np.abs(y[1,0]) * 100 + 60)
+        self.pubs["_cmd_raw_motors"].publish(self.raw_motors)
+        print "%s.prepare_output y = %s , motors = %s" % (self.__class__.__name__, y, self.raw_motors)
 
     def step(self, x):
         """SpheroSys.step"""
         print "x", x
         # x_ = self.prepare_inputs()
 
-        # self.prepare_output(x)
-        # self.pubs["_cmd_vel_raw"].publish(self.motors)
-        
-        self.prepare_output_raw_motors(x)
-        self.pubs["_cmd_raw_motors"].publish(self.raw_motors)
-        # print "%s.prepare_output y = %s , motors = %s" % (self.__class__.__name__, x, self.motors)
+        self.prepare_output(x)
+        # self.prepare_output_vel_raw(x)
+        # self.prepare_output_raw_motors(x)
 
         self.rate.sleep()
         
@@ -537,10 +556,10 @@ if __name__ == "__main__":
         # y[...,[i]] = np.random.uniform(-.3, .3, (r.dim_s_proprio, 1))
         y[...,[i]] = np.sin(np.ones((r.dim_s_proprio, 1)) * np.arange(1, r.dim_s_proprio) * i * 0.01)
         x_ = r.step(y[...,[i]])
-        print x_
-        x[...,[i]] = x_['s_proprio'].copy()
+        # print "x_", x_
+        x[...,[i]] = x_['s_proprio'].T.copy()
         # r.rate.sleep()
-        print "step[%d] input = %s, output = %s" % (i, y, x)
+        # print "step[%d] input = %s, output = %s" % (i, y, x)
         i += 1
 
     import matplotlib.pyplot as plt
