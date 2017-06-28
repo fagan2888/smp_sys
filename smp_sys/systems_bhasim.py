@@ -155,7 +155,7 @@ class BhaSimulatedSys(SMPSys):
         "friction": 0.001,
         "sysnoise": 1e-2,
         # real
-        'dim_s_motor': 9,
+        'dim_s_proprio': 9,
         'dim_s_extero': 3,
         'numsegs': 3,
         'segradii': np.array([0.1,0.093,0.079]),
@@ -180,8 +180,8 @@ class BhaSimulatedSys(SMPSys):
         """update the robot, pointmass"""
         # print "%s.step x = %s" % (self.__class__.__name__, x)
         # print "x", x.shape
-        # self.m = self.compute_motor_command(self.m + x)# .reshape((self.dim_s_motor, 1))
-        self.lens = self.compute_motor_command(x.T)# .reshape((self.dim_s_motor, 1))
+        # self.m = self.compute_motor_command(self.m + x)# .reshape((self.dim_s_proprio, 1))
+        self.lens = self.compute_motor_command(x.T)# .reshape((self.dim_s_proprio, 1))
         
         # print "m", m
         # self.apply_force(x)

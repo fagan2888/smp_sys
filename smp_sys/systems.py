@@ -294,7 +294,7 @@ class SimplearmSys(SMPSys):
         "force_min": -1.0,
         "friction": 0.001,
         "sysnoise": 1e-2,
-        'dim_s_motor': 3,
+        'dim_s_proprio': 3,
         'length_ratio': [1],
         'm_mins': -1,
         'm_maxs': 1,
@@ -326,9 +326,9 @@ class SimplearmSys(SMPSys):
 
         self.factor = 1.0
 
-        self.lengths = self.compute_lengths(self.dim_s_motor, self.length_ratio)
+        self.lengths = self.compute_lengths(self.dim_s_proprio, self.length_ratio)
 
-        self.m = np.zeros((self.dim_s_motor, 1))
+        self.m = np.zeros((self.dim_s_proprio, 1))
         
     def reset(self):
         """SimplearmSys.reset"""
@@ -373,8 +373,8 @@ class SimplearmSys(SMPSys):
         """
         # print "%s.step x = %s" % (self.__class__.__name__, x)
         # print "x", x.shape
-        # self.m = self.compute_motor_command(self.m + x)# .reshape((self.dim_s_motor, 1))
-        self.m = self.compute_motor_command(x)# .reshape((self.dim_s_motor, 1))
+        # self.m = self.compute_motor_command(self.m + x)# .reshape((self.dim_s_proprio, 1))
+        self.m = self.compute_motor_command(x)# .reshape((self.dim_s_proprio, 1))
         
         # print "m", m
         # self.apply_force(x)
@@ -407,9 +407,9 @@ class SimplearmSys(SMPSys):
 
 #         self.factor = 1.0
 
-#         self.lengths = self.compute_lengths(self.dim_s_motor, self.length_ratio)
+#         self.lengths = self.compute_lengths(self.dim_s_proprio, self.length_ratio)
 
-#         self.m = np.zeros((self.dim_s_motor, 1))
+#         self.m = np.zeros((self.dim_s_proprio, 1))
 
 #     def compute_lengths(self, n_dofs, ratio):
 #         l = np.ones(n_dofs)
@@ -425,7 +425,7 @@ class SimplearmSys(SMPSys):
 #         """update the robot, pointmass"""
 #         print "%s.step world = %s, x = %s" % (self.__class__.__name__, world, x)
 #         # print "x", x.shape
-#         self.m = self.compute_motor_command(self.m + x)# .reshape((self.dim_s_motor, 1))
+#         self.m = self.compute_motor_command(self.m + x)# .reshape((self.dim_s_proprio, 1))
         
 #         # print "m", m
 #         # self.apply_force(x)
