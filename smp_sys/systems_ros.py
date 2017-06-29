@@ -421,6 +421,7 @@ class SpheroSys(SMPSys):
         self.lag = 1 # 2
 
         # enable stabilization
+        """$ rostopic pub /disable_stabilization std_msgs/Bool False"""
         stab = Bool()
         stab.data = False
         print "stab", stab, stab.data
