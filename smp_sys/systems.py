@@ -184,13 +184,14 @@ class PointmassSys(SMPSys):
         # print "u", u, self.mass, u/self.mass
         # FIXME: insert motor transfer function
         a = (u/self.mass).reshape((self.sysdim, 1))
+        # a = (u/self.mass).reshape((self.sysdim, 1)) - self.x[:self.sysdim,[0]] * 0.025 # experimental for homeokinesis hack
         # a += np.random.normal(0.05, 0.01, a.shape)
 
-        # # world modification
-        # if np.any(self.x[:self.sysdim] > 0):
-        #     a += np.random.normal(0.05, 0.01, a.shape)
-        # else:
-        #     a += np.random.normal(-0.1, 0.01, a.shape)
+        # world modification
+        if np.any(self.x[:self.sysdim] > 0):
+            a += np.random.normal(0.05, 0.01, a.shape)
+        else:
+            a += np.random.normal(-0.1, 0.01, a.shape)
             
         # print("a.shape", a.shape)
         # print "a", a, self.x[self.conf.s_ndims/2:]
@@ -211,8 +212,8 @@ class PointmassSys(SMPSys):
         self.x[self.sysdim*2:] = a.copy()
 
         # apply noise
-        self.x += self.sysnoise * np.random.randn(self.x.shape[0], self.x.shape[1])
-
+        # self.x += self.sysnoise * np.random.randn(self.x.shape[0], self.x.shape[1])
+        
         # print "self.x[2,0]", self.x[2,0]
 
         # self.scale()
@@ -378,10 +379,12 @@ class SimplearmSys(SMPSys):
         
         # print "m", m
         # self.apply_force(x)
-        return {"s_proprio": self.m, # self.compute_sensors_proprio(),
-                "s_extero":  self.compute_sensors_extero(),
-                's_all':     self.compute_sensors(),
-                }
+        return {
+            # "s_proprio": self.m,
+            's_proprio': self.compute_sensors_proprio(),
+            "s_extero":  self.compute_sensors_extero(),
+            's_all':     self.compute_sensors(),
+            }
 
     def compute_sensors_extero(self):
         """SimplearmSys.reset"""

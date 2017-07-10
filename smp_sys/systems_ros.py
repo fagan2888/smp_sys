@@ -508,6 +508,7 @@ class SpheroSys(SMPSys):
     def step(self, x):
         """SpheroSys.step"""
         print "x", x
+        if rospy.is_shutdown(): return
         # x_ = self.prepare_inputs()
 
         self.prepare_output(x)
