@@ -21,7 +21,7 @@ motors, things that can move or somehow do stuff in any kind of world.
 #  - pointmass: mass, dimension, order(0: kinematic/pos,
 #    1: dynamic/velocity, 2: dynamic/force),
 #   - model v1
-#    - smp/smp/ode_inert_system.py: InertParticle, InertParticle2D, InertParticleND,
+#    - smp/smp/ode_inert_system.py: InertParticle, InertParticle2D, InertParticleND (the best)
 #    - smp/smpblocks/smpblocks/systems.py
 #
 #   - model v2
@@ -44,6 +44,8 @@ motors, things that can move or somehow do stuff in any kind of world.
 #    constraints on state values and provides autonmous activity from outside the agent
 
 import numpy as np
+
+from smp_base.funcs import *
 
 class SMPSys(object):
     """SMPSys
@@ -105,7 +107,7 @@ class SMPSys(object):
         return None
     
 ################################################################################
-# point mass system
+# point mass system simple
 class PointmassSys(SMPSys):
     """PointmassSys
 
@@ -166,7 +168,10 @@ class PointmassSys(SMPSys):
         self.x = self.x0.copy()
         
     def step(self, x = None, world = None):
-        """update the robot, pointmass"""
+        """PointmassSys.step
+
+        Update the robot, pointmass
+        """
         # print "%s.step[%d] x = %s" % (self.__class__.__name__, self.cnt, x)
         # x = self.inputs['u'][0]
         self.apply_force(x)
@@ -234,6 +239,366 @@ class PointmassSys(SMPSys):
         return self.x
 
 
+class Pointmass2Sys(SMPSys):
+    """Pointmass2Sys
+
+    A point mass system (pm), which is an abstract model of a rigid
+    body robot in an n-dimensional isotropic space. The robot's state
+    :math:`x = (x_a, x_v, x_p)^T \in \mathcal{R}^{3 n}` with
+
+    .. math::
+
+        \\begin{eqnarray}
+            x_a & := & \\text{acceleration} \\\\
+            x_v & := & \\text{velocity} \\\\
+            x_p & := & \\text{position} \\\\
+        \\end{eqnarray}
+
+
+    Fancy model taken from smp/smp/ode_inert_system.py
+
+    Features:
+    - Perturbation
+    - Non-isotropic forcefield
+    - Non-identity motor channel coupling
+    - Non-identity motor transfer functions
+    """
+    defaults = {
+        'sysdim': 1,
+        'a0': np.random.uniform(-0.3, 0.3, (3, 1)),
+        'v0': np.random.uniform(-0.3, 0.3, (3, 1)),
+        'x0': np.random.uniform(-0.3, 0.3, (3, 1)),
+        'statedim': 3,
+        'lag': 1,
+        'dt': 1e-1,
+        'mass': 1.0,
+        'order': 2,
+        'forcefield': False,
+        'coupling_sigma': 1e-9,
+        'transfer': False,
+        'force_max':  1.0,
+        'force_min': -1.0,
+        'friction': 0.001, # 0.012
+        'anoise_mean': 0.0,
+        'anoise_std': 2e-2,
+        'vnoise_mean': 0.0,
+        'vnoise_std': 1e-6,
+        }
+    
+    def __init__(self, conf = {}):
+        """Pointmass2Sys.__init__
+
+        Arguments:
+        - conf: configuration dictionary
+        -- mass: point _mass_
+        -- sysdim: dimension of system, usually 1,2, or 3D
+        -- statedim: 1d pointmass has 3 variables (pos, vel, acc) in this model, so sysdim * 3
+        -- dt: integration time step
+        -- x0: initial state
+        -- order: NOT IMPLEMENT (control mode of the system, order = 0 kinematic, 1 velocity, 2 force)
+        """
+        SMPSys.__init__(self, conf)
+        
+        # state is (pos, vel, acc).T
+        # self.state_dim
+        if not hasattr(self, 'x0'):
+            self.x0 = np.zeros((self.statedim, 1))
+            
+        self.x  = self.x0.copy()
+        self.cnt = 0
+
+        bla = dict(a0=0., v0=0., x0=0.,
+            numsteps=1000, dt=1, dim=2,
+            alag=20, mass = 1.0, order = 2, forcefield = False,
+            motortransfer = False, controller = False,
+            coupling_sigma = 1e-9,
+            transfer = False)
+        print "bla", bla
+        
+        # state vectors
+        self.a       = np.zeros((self.sysdim, 1))
+        self.a_noise = np.zeros((self.sysdim, 1))
+        self.v       = np.zeros((self.sysdim, 1))
+        self.v_noise = np.zeros((self.sysdim, 1))
+        self.x       = np.zeros((self.sysdim, 1))
+        self.u       = np.zeros((self.sysdim, 1))
+        # command buffer to simulate motor delay
+        self.u_delay = np.zeros((self.sysdim, self.lag))
+        
+        # reset states
+        self.reset()
+
+        ############################################################
+        # motor to force coupling: f = h(C * a), with coupling matrix C and transfer function h
+        # coupling matrix C, default is Identity
+        self.coupling_a_v = np.eye(self.sysdim)
+        # non-identity coupling
+        self.coupling_a_v_noise(sigma = self.coupling_sigma)
+
+        # coupling transfer functions
+        # self.transfer = transfer
+        if self.transfer > 0:
+            self.coupling_funcs = [linear, nonlin_1, nonlin_2, nonlin_3]
+        else:
+            self.coupling_funcs = [identity]
+            
+        # random;y select a transfer function for each dimension
+        self.coupling_func_a_v = np.random.choice(self.coupling_funcs, self.sysdim)
+        # debugging coupling transfer functions
+        # for f_ in self.coupling_func_a_v:
+        #     print "f_", type(f_), f_.__name__, f_(x = 10.0)
+        # print "coupling_func_a_v", type(self.coupling_func_a_v)
+
+        
+    def reset(self):
+        """Pointmass2Sys.reset
+
+        Reset state x to initial state x0
+        """
+        self.x = self.x0.copy()
+        
+    def coupling_a_v_noise(self, sigma = 1e-1):
+        """Pointmass2Sys.coupling_a_v_noise
+
+        Create additional random coupling between the motor channels and the system dimensions
+        """
+        print "coupling 0", self.coupling_a_v
+        self.coupling_a_v += np.random.uniform(-sigma, sigma, self.coupling_a_v.shape)
+        # self.coupling_a_v = np.random.uniform(-sigma, sigma, self.coupling_a_v.shape)
+        print "coupling n", self.coupling_a_v
+
+    def coupling_func_a_v_apply(self, x):
+        """Pointmass2Sys.coupling_func_a_v_apply
+
+        Element-wise func application
+        """
+        for i in range(self.sysdim):
+            x[i] = self.coupling_func_a_v[i](x[i])
+        return x
+    
+    def step_single(self, u = None):
+        """Pointmass2Sys.step
+
+        Compute one integration step
+        """
+        assert u is not None
+        # print "ip2d control", self.u[i-self.lag]
+        # vdot = a[i]
+
+        # compute acceleration noise
+        self.anoise = np.random.normal(self.anoise_mean, self.anoise_std, size = (1, self.sysdim))
+
+        # motor delay / lag
+        self.u_delay[...,[0]] = u
+        u = self.u_delay[...,-1]
+        self.u_delay = np.roll(self.u_delay, 1, axis = 1)
+
+        # action
+        self.a = (u + self.anoise)/self.mass
+        # self.a = u/self.mass
+        self.a = np.dot(self.coupling_a_v, self.a.T) 
+        self.a = self.coupling_func_a_v_apply(self.a)
+
+        # motor out bounding
+        self.a = self.bound_motor(self.a)
+        
+        # vnoise = np.random.normal(self.vnoise_mean, self.vnoise_std,
+        #                           size=(1, self.sysdim))
+        # self.v_noise[i+1] = vnoise
+        
+        # 0.99 is damping / friction
+        if self.order == 2:
+            self.v = self.x[self.sysdim:self.sysdim*2] * (1 - self.friction) + (self.a * self.dt)
+            self.p = self.x[:self.sysdim] + self.v * self.dt
+        elif self.order == 1:
+            self.v = self.a
+            # this introduces saturation of position p
+            self.p = self.x[:self.sysdim] * (1 - self.friction) + (self.v * self.dt)
+            # self.p = self.x[:self.sysdim] + (self.v * self.dt)
+        elif self.order == 0:
+            self.v = self.a - (self.v * self.friction) # (self.v[i] * (1 - self.friction)) + (self.a[i+1] * self.dt) # + vnoise
+            self.p = self.a * 0.2 + self.p * 0.8
+            
+        # collect temporary state description (p,v,a) into joint state vector x
+        self.x[:self.sysdim] = self.p.copy()
+        self.x[self.sysdim:self.sysdim*2] = self.v.copy()
+        self.x[self.sysdim*2:] = self.a.copy()
+                
+    # def step2(self, i, dt):
+    #     """Pointmass2Sys.step2
+
+    #     Perform n substeps for each step, integratiing at super-resolution
+    #     """
+    #     # self.step
+    #     substeps = 10
+    #     dtl = dt/float(substeps)
+    #     # print "dtl", dtl
+    #     a_ = np.zeros((1, self.sysdim))
+    #     a_noise_ = np.zeros((1, self.sysdim))
+    #     v = self.v[i].copy()
+    #     x = self.x[i].copy()
+    #     # print "x pre", x
+    #     # print "u", self.u[i-self.lag]
+    #     for j in range(substeps):
+    #         anoise = np.random.normal(self.anoise_mean, self.anoise_std,
+    #                                   size=(1, self.sysdim))
+    #         if self.forcefield:
+    #             aff = self.force_field(x)
+    #         else:
+    #             aff = np.zeros_like(x) # 
+    #         anoise += aff # add to the other noise
+    #         a_noise_ += anoise
+    #         # self.a_noise[i+1] = anoise
+    #         # with delayed action
+    #         a = (self.u[i-self.lag] + anoise)/self.mass
+    #         # print "a", a
+    #         a_ += a
+    #         # print a_
+    #         # 0.99 is damping / friction
+    #         # self.friction
+    #         v = (v * (1 - 0.001)) + (a * dtl) # + vnoise
+    #         # self.v[i+1] = (self.v[i] * (1 - self.friction)) + (self.a[i+1] * dt) # + vnoise
+    #         # print v[i+1]
+    #         x = x.copy() + v * dtl
+    #         # print "x inner", x
+    #     # print "v", v
+    #     self.a[i+1] = a_.copy()
+    #     self.a_noise[i+1] = a_noise_
+    #     self.v[i+1] = v.copy()
+    #     self.x[i+1] = x.copy()
+    #     # print "x", x, self.x[i-1], self.x[i], self.x[i+1]
+    
+    # def step3(self, i, dt):
+    #     """Pointmass2Sys.step3
+
+    #     Another step function variation dealing more compactly with temporal indices
+    #     """
+    #     anoise = np.random.normal(self.anoise_mean, self.anoise_std,
+    #                               size=(1, self.sysdim))
+    #     # force field
+    #     if self.forcefield:
+    #         aff = self.force_field(self.x[i])
+    #     else:
+    #         aff = np.zeros_like(self.x[i]) # 
+    #     anoise += aff # add to the other noise
+    #     self.a_noise[i] = anoise
+        
+    #     # FIXME: this is a hack and doesn't expose the final motor signal
+    #     # to the obuf
+    #     u = self.u[i-self.lag]
+    #     if self.motortransfer:
+    #         u = self.motortransfer_func(u)
+    #         self.u[i-self.lag] = u            
+    #     self.a[i] = (u + anoise)/self.mass
+        
+    #     # 0.99 is damping / friction
+    #     # update velocity
+    #     self.v[i+1] = (self.v[i] * (1 - self.friction)) + (self.a[i] * dt) # + vnoise
+    #     # update position
+    #     self.x[i+1] = self.x[i] + self.v[i+1] * dt
+        
+    # def simulate(self):
+    #     for i in range(self.numsteps-1):
+    #         # self.control(i)
+    #         self.step(i, self.dt)
+
+    # def force_field(self, x):
+    #     # pass
+    #     return power4(x)
+    # return sinc(x)
+
+    # def show_result(self):
+    #     import pylab as pl
+    #     pl.subplot(311)
+    #     pl.plot(self.a * 0.01, label="a")
+    #     pl.plot(self.u * 0.1, label="u")
+    #     pl.legend()
+    #     pl.subplot(312)
+    #     pl.plot(self.v, label="v")
+    #     pl.legend()
+    #     pl.subplot(313)
+    #     pl.plot(self.x, label="x")
+    #     pl.legend()
+    #     pl.show()
+        
+    def step(self, x = None):
+        """Pointmass2Sys.step
+
+        One update step and return system dict
+        """
+        # print "%s.step[%d] x = %s" % (self.__class__.__name__, self.cnt, x)
+        # x = self.inputs['u'][0]
+        # self.apply_force(x)
+        # self.step_single(self.bound_motor(x))
+        self.step_single(x)
+        self.cnt += 1
+        # return dict of state values
+        return {'s_proprio': self.compute_sensors_proprio(),
+                's_extero':  self.compute_sensors_extero(),
+                's_all':     self.compute_sensors(),
+        }
+        
+    def bound_motor(self, m):
+        """Pointmass2Sys.bound_motor
+
+        Bound the motor values to max/min values
+        """
+        return np.clip(m, self.force_min, self.force_max)
+
+    def apply_force(self, u):
+        """control pointmass with force command (2nd order)"""
+        # print "u", u, self.mass, u/self.mass
+        # FIXME: insert motor transfer function
+        a = (u/self.mass).reshape((self.sysdim, 1))
+        # a = (u/self.mass).reshape((self.sysdim, 1)) - self.x[:self.sysdim,[0]] * 0.025 # experimental for homeokinesis hack
+        # a += np.random.normal(0.05, 0.01, a.shape)
+
+        # world modification
+        if np.any(self.x[:self.sysdim] > 0):
+            a += np.random.normal(0.05, 0.01, a.shape)
+        else:
+            a += np.random.normal(-0.1, 0.01, a.shape)
+            
+        # print("a.shape", a.shape)
+        # print "a", a, self.x[self.conf.s_ndims/2:]
+        v = self.x[self.sysdim:self.sysdim*2] * (1 - self.friction) + a * self.dt
+        
+        # self.a_ = a.copy()
+        
+        
+        # # world modification
+        # v += np.sin(self.cnt * 0.01) * 0.05
+        
+        # print "v", v
+        p = self.x[:self.sysdim] + v * self.dt
+
+        # collect temporary state description (p,v,a) into joint state vector x
+        self.x[:self.sysdim] = p.copy()
+        self.x[self.sysdim:self.sysdim*2] = v.copy()
+        self.x[self.sysdim*2:] = a.copy()
+
+        # apply noise
+        # self.x += self.sysnoise * np.random.randn(self.x.shape[0], self.x.shape[1])
+        
+        # print "self.x[2,0]", self.x[2,0]
+
+        # self.scale()
+        # self.pub()                
+        self.cnt += 1
+        
+        # return x
+        # self.x = x # pointmasslib.simulate(self.x, [u], self.dt)
+
+    def compute_sensors_proprio(self):
+        return self.x[self.sysdim*2:]
+    
+    def compute_sensors_extero(self):
+        return self.x[self.sysdim:self.sysdim*2]
+    
+    def compute_sensors(self):
+        """compute the proprio and extero sensor values from state"""
+        return self.x
+    
 ################################################################################
 # simple arm system, from explauto
     
