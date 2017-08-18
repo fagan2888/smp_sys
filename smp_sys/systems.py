@@ -324,6 +324,7 @@ class Pointmass2Sys(SMPSys):
         self.u       = np.zeros((self.sysdim, 1))
         # command buffer to simulate motor delay
         self.u_delay = np.zeros((self.sysdim, self.lag))
+        print "u_delay", self.u_delay.shape
         
         # reset states
         self.reset()
@@ -382,17 +383,15 @@ class Pointmass2Sys(SMPSys):
         Compute one integration step
         """
         assert u is not None
-        # print "ip2d control", self.u[i-self.lag]
-        # vdot = a[i]
 
         # compute acceleration noise
         self.anoise = np.random.normal(self.anoise_mean, self.anoise_std, size = (1, self.sysdim))
 
         # motor delay / lag
-        self.u_delay[...,[0]] = u
-        u = self.u_delay[...,-1]
-        self.u_delay = np.roll(self.u_delay, 1, axis = 1)
-
+        self.u_delay[...,[0]] = u.copy()
+        u = self.u_delay[...,[-1]].T
+        self.u_delay = np.roll(self.u_delay, shift = 1, axis = 1)
+        
         # action
         self.a = (u + self.anoise)/self.mass
         # self.a = u/self.mass
