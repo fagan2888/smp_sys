@@ -654,6 +654,7 @@ class SimplearmSys(SMPSys):
         'x0': np.random.uniform(-0.3, 0.3, (3, 1)),
         'statedim': 3,
         'dt': 1e-1,
+        'lag': 1,
         'mass': 1.0,
         "force_max":  1.0,
         "force_min": -1.0,
@@ -687,7 +688,8 @@ class SimplearmSys(SMPSys):
         self.x  = self.x0.copy()
         self.cnt = 0
 
-
+        # command buffer to simulate motor delay
+        self.u_delay = np.zeros((self.dim_s_proprio, self.lag))
 
         self.factor = 1.0
 
@@ -740,6 +742,10 @@ class SimplearmSys(SMPSys):
         # print "x", x.shape
         # self.m = self.compute_motor_command(self.m + x)# .reshape((self.dim_s_proprio, 1))
         self.m = self.compute_motor_command(x)# .reshape((self.dim_s_proprio, 1))
+        
+        self.u_delay[...,[0]] = self.m.copy()
+        self.m = self.u_delay[...,[-1]]
+        self.u_delay = np.roll(self.u_delay, shift = 1, axis = 1)
         
         # print "m", m
         # self.apply_force(x)

@@ -45,8 +45,8 @@ def bounds_min_max(v, mins, maxs):
 def plot_taskspace_positions(positions, style='ob'):
     fig = plt.gcf()
     if positions.shape[1] == 3:
-        ax = fig.gca(projection='3d')
-        ax.plot(positions[:,0], positions[:,1], positions[:,2], style)
+        ax = fig.add_subplot(projection='3d') # gca(projection='3d')
+        # ax.plot(positions[:,0], positions[:,1], positions[:,2], style)
     elif positions.shape[1] == 2:
         ax = fig.gca()
         ax.plot(positions[:,0], positions[:,1], style)
@@ -352,8 +352,13 @@ class BhaSimulatedSys(SMPSys):
                 ax.set_xlabel('X')
                 ax.set_ylabel('Y')
                 ax.set_zlabel('Z')
+                # print "ax.xlim", ax.get_xlim()
+                ax.set_xlim([-0.5, 0.5])
+                ax.set_ylim([-0.5, 0.5])
+                ax.set_zlim([0, 1])
                 plt.draw()
-                time.sleep(0.5)
+                plt.pause(1e-9)
+                # time.sleep(0.5)
             plt.ioff()
 
 ###################################### end of class definition ######################################

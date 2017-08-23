@@ -234,7 +234,7 @@ class LPZBarrelSys(SMPSys):
             'motors': rospy.Publisher(
                 "/lpzbarrel/motors", Float64MultiArray, queue_size = 2),
             'sensors': rospy.Publisher(
-                "/lpzbarrel/x", Float32MultiArray, queue_size = 2)
+                "/lpzbarrel/x", Float64MultiArray, queue_size = 2)
             }
         self.subs = {
             'sensors': rospy.Subscriber("/lpzbarrel/sensors", Float64MultiArray, self.cb_sensors),
@@ -246,8 +246,10 @@ class LPZBarrelSys(SMPSys):
         self.sensors = Float64MultiArray()
         self.sensors.data = [0.0 for i in range(self.numsen_raw)]
         self.sensors_raw  = np.array([self.sensors.data])
+        self.inputs_polar  = np.array([self.sensors.data])
+        self.dinputs_polar  = np.array([self.sensors.data])
         self.motors  = Float64MultiArray()
-        self.motors.data = [0.0 for i in range(self.nummot)]
+        self.motors.data = [1.0 for i in range(self.nummot)]
         self.lag = 2
             
         # timing
@@ -273,8 +275,22 @@ class LPZBarrelSys(SMPSys):
         sdata = self.sensors.data
         # print "%s.prepare_inputs sdata = %s" % (self.__class__.__name__, type(sdata))
         inputs = np.array([sdata])
-        # inputs = self.sensors_raw
-        # print "%s.prepare_inputs inputs = %s" % (self.__class__.__name__, inputs.shape)
+        # inputs_polar = np.arctan2(inputs[0,1], inputs[0,0])
+        # dinputs_polar = np.clip(inputs_polar - self.inputs_polar, -0.5, 0.5)
+        
+        # if np.any(dinputs_polar >= np.pi):
+        #     dinputs_polar -= 2 * np.pi
+        # elif np.any(dinputs_polar <= -np.pi):
+        #     dinputs_polar += 2 * np.pi
+            
+        # self.dinputs_polar = self.dinputs_polar * 0.8 + dinputs_polar * 0.2
+        
+        # self.inputs_polar[:]  = self.inputs_polar[:] * 0.8 + inputs_polar * 0.2
+        # print "inputs_polar", inputs_polar, dinputs_polar
+        # inputs = self.dinputs_polar
+        # # inputs = self.sensors_raw
+        # # print "%s.prepare_inputs inputs = %s" % (self.__class__.__name__, inputs.shape)
+        # self.sensors.data = inputs.flatten().tolist()
         return inputs.T
 
     def prepare_output(self, y):
@@ -293,17 +309,25 @@ class LPZBarrelSys(SMPSys):
         if rospy.is_shutdown(): return
         # print "%s.step x = %s %s, motor data = %s" % (self.__class__.__name__, x.dtype, x.flatten().tolist(), type(self.motors.data))
 
+        # if self.cnt < 100:
+        #     # x = np.ones_like(x)
+        #     x = np.random.uniform(-2.0, 2.0, x.shape)
+            
         self.motors.data = x.flatten().tolist()
             
         self.pubs["motors"].publish(self.motors)
+        inputs = self.prepare_inputs()
+        self.pubs["sensors"].publish(self.sensors)
 
         self.rate.sleep()
 
         # self.outdict["s_proprio"] = self.smdict["s_proprio"]
         # self.outdict["s_extero"] = self.smdict["s_extero"]
+
+        self.cnt += 1
         
         return {
-            's_proprio': self.prepare_inputs(),
+            's_proprio': inputs,
             's_extero' : np.zeros((1,1))
             }
 
