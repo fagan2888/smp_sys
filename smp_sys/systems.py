@@ -43,6 +43,7 @@ motors, things that can move or somehow do stuff in any kind of world.
 #  - A system should be given a reference to a 'world' that implies
 #    constraints on state values and provides autonmous activity from outside the agent
 
+from functools import partial
 import numpy as np
 
 from smp_base.funcs import *
@@ -307,13 +308,13 @@ class Pointmass2Sys(SMPSys):
         self.x  = self.x0.copy()
         self.cnt = 0
 
-        bla = dict(a0=0., v0=0., x0=0.,
-            numsteps=1000, dt=1, dim=2,
-            alag=20, mass = 1.0, order = 2, forcefield = False,
-            motortransfer = False, controller = False,
-            coupling_sigma = 1e-9,
-            transfer = False)
-        print "bla", bla
+        # bla = dict(a0=0., v0=0., x0=0.,
+        #     numsteps=1000, dt=1, dim=2,
+        #     alag=20, mass = 1.0, order = 2, forcefield = False,
+        #     motortransfer = False, controller = False,
+        #     coupling_sigma = 1e-9,
+        #     transfer = False)
+        # print "bla", bla
         
         # state vectors
         self.a       = np.zeros((self.sysdim, 1))
@@ -339,6 +340,7 @@ class Pointmass2Sys(SMPSys):
         # coupling transfer functions
         # self.transfer = transfer
         if self.transfer > 0:
+            # self.coupling_funcs = [partial(f, a = np.random.uniform(-1, 1), b = np.random.uniform(-1, 1)) for f in [linear, nonlin_1, nonlin_3]] # nonlin_2, 
             self.coupling_funcs = [linear, nonlin_1, nonlin_2, nonlin_3]
         else:
             self.coupling_funcs = [identity]
