@@ -681,6 +681,12 @@ class SimplearmSys(SMPSys):
         -- x0: initial state
         -- order: NOT IMPLEMENT (control mode of the system, order = 0 kinematic, 1 velocity, 2 force)
         """
+        # check defaults
+        for k in self.defaults.keys():
+            if not conf.has_key(k):
+                conf[k] = self.defaults[k]
+            assert conf.has_key(k), "conf doesn't have required attribute %s, defaults = %s" % (k, self.defaults[k])
+        
         SMPSys.__init__(self, conf)
         
         # state is (pos, vel, acc).T
