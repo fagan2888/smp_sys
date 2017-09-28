@@ -324,7 +324,7 @@ class Pointmass2Sys(SMPSys):
         self.x       = np.zeros((self.sysdim, 1))
         self.u       = np.zeros((self.sysdim, 1))
         # command buffer to simulate motor delay
-        self.u_delay = np.zeros((self.sysdim, self.lag))
+        self.u_delay = np.zeros((self.sysdim, self.lag + 1)) # lag 1 implies two time steps
         print "u_delay", self.u_delay.shape
         
         # reset states
@@ -697,7 +697,7 @@ class SimplearmSys(SMPSys):
         self.cnt = 0
 
         # command buffer to simulate motor delay
-        self.u_delay = np.zeros((self.dim_s_proprio, self.lag))
+        self.u_delay = np.zeros((self.dim_s_proprio, self.lag + 1))
 
         self.factor = 1.0
 
