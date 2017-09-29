@@ -325,7 +325,7 @@ class Pointmass2Sys(SMPSys):
         self.u       = np.zeros((self.sysdim, 1))
         # command buffer to simulate motor delay
         self.u_delay = np.zeros((self.sysdim, self.lag + 1)) # lag 1 implies two time steps
-        print "u_delay", self.u_delay.shape
+        # print "u_delay", self.u_delay.shape
         
         # reset states
         self.reset()
@@ -365,10 +365,10 @@ class Pointmass2Sys(SMPSys):
 
         Create additional random coupling between the motor channels and the system dimensions
         """
-        print "coupling 0", self.coupling_a_v
+        # print "coupling 0", self.coupling_a_v
         self.coupling_a_v += np.random.uniform(-sigma, sigma, self.coupling_a_v.shape)
         # self.coupling_a_v = np.random.uniform(-sigma, sigma, self.coupling_a_v.shape)
-        print "coupling n", self.coupling_a_v
+        # print "coupling n", self.coupling_a_v
 
     def coupling_func_a_v_apply(self, x):
         """Pointmass2Sys.coupling_func_a_v_apply
