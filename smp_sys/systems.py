@@ -299,6 +299,8 @@ class Pointmass2Sys(SMPSys):
         -- order: NOT IMPLEMENT (control mode of the system, order = 0 kinematic, 1 velocity, 2 force)
         """
         SMPSys.__init__(self, conf)
+
+        # print "pm init", self.sysdim, self.statedim, conf['sysdim']
         
         # state is (pos, vel, acc).T
         # self.state_dim
@@ -390,6 +392,7 @@ class Pointmass2Sys(SMPSys):
         self.anoise = np.random.normal(self.anoise_mean, self.anoise_std, size = (1, self.sysdim))
 
         # motor delay / lag
+        # print "self.u_delay", self.u_delay.shape, "u", u.shape
         self.u_delay[...,[0]] = u.copy()
         u = self.u_delay[...,[-1]].T
         self.u_delay = np.roll(self.u_delay, shift = 1, axis = 1)
