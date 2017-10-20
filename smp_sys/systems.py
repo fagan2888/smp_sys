@@ -14,7 +14,6 @@ signal generator, ...
 will probably not produce any interesting output without any
 input. Examples are all actual simulated and real robots, things with
 motors, things that can move or somehow do stuff in any kind of world.
-
 """
 
 # existing systems in legacy code for pulling in
@@ -49,15 +48,16 @@ import numpy as np
 from smp_base.funcs import *
 
 class SMPSys(object):
-    """SMPSys
+    """SMPSys class
 
     Basic smp system class
+     - Takes the configuration dict and copies all items to corresponding class members
+     - Checks for presence of ROS libraries
+     - Initializes pubs/subs dictionaries
 
-    :param dict conf: a configuration dictionary
+    Arguments:
+     - conf(dict): configuration dictionary
 
-    Takes the config dict and copies all items to corresponding class members
-    Checks for presence of ROS libraries
-    Initializes pubs/subs dictionaries
     """
     def __init__(self, conf = {}):
         """SMPSys.__init__
