@@ -2,18 +2,33 @@
 
 A system in the smp framework is any thing that can be packed into a
 box with inputs and outputs and some kind of internal activity that
-transforms inputs into outputs.
+transforms inputs into outputs. We distinguish open-loop systems (OLS)
+and closed-loop systems (CLS).
 
-I distinguish open-loop systems (OLS) and closed-loop systems (CLS).
-
-*OLS*'s are autonomous data sources that ignore any actual input, just
-do their thing and produce some output. Examples are a file reader, a
-signal generator, ...
-
-*CLS*'s are data sources that depend fundamentally on some input and
-will probably not produce any interesting output without any
+**OLS**'s are autonomous data sources that ignore any actual input, just
+do their thing and autonomously produce some output. Examples are file
+readers, signal generators, and other read-only information
+taps. **CLS**'s are data sources that depend fundamentally on some input
+and will probably not produce any interesting output without any
 input. Examples are all actual simulated and real robots, things with
-motors, things that can move or somehow do stuff in any kind of world.
+motors, things that can move or somehow do stuff in any kind of real
+or simulated world.
+
+Classically systems are clear cut and well established concepts. In
+the self-exploration context, systems are seen as instances of
+explanation challenges or problems. Ideally we would like to be able
+to sample systems from the space of all problems conditioned on some
+essential parameters or system properties which control the degrees of
+difficulty of the explanation problems. This implies systematic
+knowledge of problem difficulty and systematic knowledge of adequate
+agents for a given level of difficulty.
+
+TODO:
+ - fix order 0 to be zero, pm and others, intrinsic order for 'real' systems
+ - fix mappings from intrinsic modalities and dimensions to configured dims
+ - add spatial constraints / environments to these basic systems to be
+   able to show indirect inference of external space from prediction violations
+   caused by constraints
 """
 
 # existing systems in legacy code for pulling in
@@ -40,7 +55,8 @@ motors, things that can move or somehow do stuff in any kind of world.
 
 # TODO
 #  - A system should be given a reference to a 'world' that implies
-#    constraints on state values and provides autonmous activity from outside the agent
+#    constraints on state values and provides autonmous activity from
+#    outside the agent
 
 from functools import partial
 import numpy as np
@@ -51,7 +67,8 @@ class SMPSys(object):
     """SMPSys class
 
     Basic smp system class
-     - Takes the configuration dict and copies all items to corresponding class members
+     - Takes the configuration dict and copies all items to
+       corresponding class members
      - Checks for presence of ROS libraries
      - Initializes pubs/subs dictionaries
 
@@ -68,9 +85,11 @@ class SMPSys(object):
 
         - conf: a configuration dictionary
 
-        Takes the config dict and copies all items to corresponding class members
-        Checks for presence of ROS libraries
-        Initializes pubs/subs dictionaries
+        Takes the config dict and copies all items to corresponding
+        class members
+
+        Checks for presence of ROS libraries and initializes pubs/subs
+        dictionaries
         """
 
         self.conf = conf
@@ -130,6 +149,17 @@ class PointmassSys(SMPSys):
     seems to be the same code as in `explauto/environments/pointmass
     <https://github.com/x75/explauto/blob/smp/explauto/environment/pointmass/pointmass.py>`_.
 
+    Arguments:
+     - conf: configuration dictionary
+
+    Configuration:
+     - mass: mass parameter [1.0]
+     - sysdim: dimension of system, usually 1,2, or 3D
+     - statedim: 1d pointmass has 3 variables (pos, vel, acc) in this model, so sysdim * 3
+     - dt: integration time step
+     - x0: initial state
+     - order: NOT IMPLEMENT (control mode of the system, order = 0 kinematic, 1 velocity, 2 force)
+
     Missing: noise, motor aberration, transfer funcs, ...
     """
     defaults = {
@@ -146,15 +176,6 @@ class PointmassSys(SMPSys):
     
     def __init__(self, conf = {}):
         """Pointmass.__init__
-
-        Arguments:
-        - conf: configuration dictionary
-        -- mass: point _mass_
-        -- sysdim: dimension of system, usually 1,2, or 3D
-        -- statedim: 1d pointmass has 3 variables (pos, vel, acc) in this model, so sysdim * 3
-        -- dt: integration time step
-        -- x0: initial state
-        -- order: NOT IMPLEMENT (control mode of the system, order = 0 kinematic, 1 velocity, 2 force)
         """
         SMPSys.__init__(self, conf)
         
@@ -296,7 +317,7 @@ class Pointmass2Sys(SMPSys):
         -- statedim: 1d pointmass has 3 variables (pos, vel, acc) in this model, so sysdim * 3
         -- dt: integration time step
         -- x0: initial state
-        -- order: NOT IMPLEMENT (control mode of the system, order = 0 kinematic, 1 velocity, 2 force)
+        -- order: not implemented (control mode of the system, order = 0 kinematic, 1 velocity, 2 force)
         """
         SMPSys.__init__(self, conf)
 
