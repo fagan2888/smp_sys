@@ -64,6 +64,7 @@ TODO:
 #    constraints on state values and provides autonmous activity from
 #    outside the agent
 
+import copy
 from functools import partial
 import numpy as np
 
@@ -78,35 +79,44 @@ class SMPSys(object):
      - Checks for presence of ROS libraries
      - Initializes pubs/subs dictionaries
 
+    Defaults:
+     - order(int): system order is the order of its difference equation (depth of the recurrence relation?)
+     - dims(dict): the system's variables as name:config pairs
+     - mem:(float): the amount of intrinsic memory
+
+    Variables in `dims` are configured with:
+     - dim(int): dimension of the vector variable
+     - dist(float): distance of variable to proprioception (experimental: information distance?)
+     - initial(spec): initial state, either an array or a distribution with parameters
+     - stats(dict): dict of statistical moments like mean and variance
+
     Arguments:
      - conf(dict): configuration dictionary
-
     """
+    defaults = {
+        'order': 0,
+        'dims': {
+            's0': {'dim': 1, 'dist': 0.,},
+        },
+        'mem': 1,
+        'cnt': 0,
+    }
     def __init__(self, conf = {}):
         """SMPSys.__init__
-
-        Basic smp system class init
-
-        Arguments:
-
-        - conf: a configuration dictionary
-
-        Takes the config dict and copies all items to corresponding
-        class members
-
-        Checks for presence of ROS libraries and initializes pubs/subs
-        dictionaries
         """
-
-        self.conf = conf
-        # set_attr_from_dict(self, conf) # check that this is OK
-
-        # set_attr_from_dict_ifs(self, ifs_conf)
+        # prepare the conf
+        self.conf = {}
+        # set base class and self defaults
+        self.conf.update(SMPSys.defaults, **self.defaults)
+        # update with instance conf
+        self.conf.update(conf)
         
-        # self.id = self.__class__.__name__
-        for k, v in conf.items():
-            setattr(self, k, v)
-            # print "%s.init self.%s = %s" % (self.__class__.__name__, k, v)
+        # copy self.conf to self attributes
+        self.__dict__.update(copy.deepcopy(self.conf))
+        
+        # for k, v in self.conf.items():
+        #     setattr(self, k, v)
+        #     # print "%s.init self.%s = %s" % (self.__class__.__name__, k, v)
 
         # FIXME: check for sensorimotor delay configuration
         # FIXME: check for motor range configuration
@@ -125,8 +135,6 @@ class SMPSys(object):
         :param numpy.ndarray x: the input column vector
 
         Does nothing.
-        
-
 
         :returns: None
         """
@@ -187,9 +195,9 @@ class PointmassSys(SMPSys):
         
         # state is (pos, vel, acc).T
         # self.state_dim
-        if not hasattr(self, 'x0'):
-            self.x0 = np.zeros((self.statedim, 1))
-        self.x  = self.x0.copy()
+        # if not hasattr(self, 'x0'):
+        #     self.x0 = np.zeros((self.statedim, 1))
+        # self.x  = self.x0.copy()
         self.cnt = 0
 
     def reset(self):
@@ -292,14 +300,20 @@ class Pointmass2Sys(SMPSys):
     """
     defaults = {
         'sysdim': 1,
+        'order': 0,
+        'dims': {
+            # 'm0': {'dim': 1, 'dist': 0, 'initial': np.zeros((1, 1)), 'lag': 1},
+            's0': {'dim': 1, 'dist': 0, 'initial': np.random.uniform(-1.0, 1.0, (1, 1))},
+        },
+        'x': {},
+        'lag': 1,
+        'dt': 1e-1,
+        'mass': 1.0,
+        # 
         'a0': np.random.uniform(-0.3, 0.3, (3, 1)),
         'v0': np.random.uniform(-0.3, 0.3, (3, 1)),
         'x0': np.random.uniform(-0.3, 0.3, (3, 1)),
         'statedim': 3,
-        'lag': 1,
-        'dt': 1e-1,
-        'mass': 1.0,
-        'order': 2,
         'forcefield': False,
         'coupling_sigma': 1e-9,
         'transfer': False,
@@ -324,17 +338,18 @@ class Pointmass2Sys(SMPSys):
         -- x0: initial state
         -- order: not implemented (control mode of the system, order = 0 kinematic, 1 velocity, 2 force)
         """
+        # init parent, set defaults and update with config
         SMPSys.__init__(self, conf)
 
         # print "pm init", self.sysdim, self.statedim, conf['sysdim']
         
-        # state is (pos, vel, acc).T
-        # self.state_dim
-        if not hasattr(self, 'x0'):
-            self.x0 = np.zeros((self.statedim, 1))
+        # # initial states
+        
+        # if not hasattr(self, 'x0'):
+        #     self.x0 = np.zeros((self.statedim, 1))
             
-        self.x  = self.x0.copy()
-        self.cnt = 0
+        # self.x  = self.x0.copy()
+        # self.cnt = 0
 
         # bla = dict(a0=0., v0=0., x0=0.,
         #     numsteps=1000, dt=1, dim=2,
@@ -344,16 +359,25 @@ class Pointmass2Sys(SMPSys):
         #     transfer = False)
         # print "bla", bla
         
-        # state vectors
-        self.a       = np.zeros((self.sysdim, 1))
-        self.a_noise = np.zeros((self.sysdim, 1))
-        self.v       = np.zeros((self.sysdim, 1))
-        self.v_noise = np.zeros((self.sysdim, 1))
-        self.x       = np.zeros((self.sysdim, 1))
-        self.u       = np.zeros((self.sysdim, 1))
+        # # state vectors
+        # self.a       = np.zeros((self.sysdim, 1))
+        # # self.a_noise = np.zeros((self.sysdim, 1))
+        # self.v       = np.zeros((self.sysdim, 1))
+        # # self.v_noise = np.zeros((self.sysdim, 1))
+        # self.x       = np.zeros((self.sysdim, 1))
+
+        
+        # self.u       = np.zeros((self.sysdim, 1))
         # command buffer to simulate motor delay
-        self.u_delay = np.zeros((self.sysdim, self.lag + 1)) # lag 1 implies two time steps
+        
+        # self.u_delay = np.zeros((self.sysdim, self.lag + 1)) # lag 1 implies two time steps
         # print "u_delay", self.u_delay.shape
+
+        # make sure variable description matches with order
+        self.check_dims_order()
+        
+        # make sure variable description has at least one motor entry
+        self.check_dims_motor()
         
         # reset states
         self.reset()
@@ -373,21 +397,75 @@ class Pointmass2Sys(SMPSys):
         else:
             self.coupling_funcs = [identity]
             
-        # random;y select a transfer function for each dimension
+        # randomly select a transfer function for each dimension
         self.coupling_func_a_v = np.random.choice(self.coupling_funcs, self.sysdim)
         # debugging coupling transfer functions
         # for f_ in self.coupling_func_a_v:
         #     print "f_", type(f_), f_.__name__, f_(x = 10.0)
         # print "coupling_func_a_v", type(self.coupling_func_a_v)
 
-        
+    def check_dims_order(self):
+        """check_dims
+
+        Make sure dims spec is complete
+         - variable description 'dims' matches with order and has an sN entry for every N in [0, ..., order]
+        """
+        for o in range(self.order + 1):
+            ordk = 's%d' % (o, )
+            if not self.dims.has_key(ordk):
+                self.dims[ordk] = {'dim': self.sysdim, 'dist': float(o), 'initial': np.random.uniform(-1, 1, (self.sysdim, 1))}
+                print "adding variable %s = %s to comply with system order %d" % (ordk, self.dims[ordk], self.order)
+
+    def check_dims_motor(self):
+        mks = [k for k in self.dims.keys() if k.startswith('m')]
+        print "motor keys = %s" % (mks, )
+        # no motor definitions
+        if len(mks) < 1:
+            # add default motor at order 0
+            mks.append('m0')
+            self.dims['m0'] = {'dim': self.sysdim, 'dist': 0, 'initial': np.zeros((self.sysdim, 1)), 'lag': self.lag},
+        # sort motor keys
+        mks.sort()
+        # infer highest order of motor input
+        self.order_motor = int(mks[0][1:])
+            
     def reset(self):
         """Pointmass2Sys.reset
 
         Reset state x to initial state x0
         """
-        self.x = self.x0.copy()
-        
+        # state vector: array or dict? set initial state from config
+        for dk, dv in self.dims.items():
+            # required entries
+            if not dv.has_key('initial'):
+                dv['initial'] = np.random.uniform(-1, 1, (dv['dim'], 1))
+            if not dv.has_key('dissipation'):
+                dv['dissipation'] = 0.0
+
+            # motor special: augment dims with additional motor variables
+            if dk[0] == 'm': # dk.startswith('m'):
+                # fix missing lag
+                if not dv.has_key('lag'):
+                    dv['lag'] = 1
+                # add motor delayline entry
+                self.x[self.get_k_plus(dk, 'd')] = np.zeros((dv['dim'], dv['lag'] + 1))
+                # add predicted motor entry (the input)
+                self.x[self.get_k_plus(dk, 'p')] = np.zeros((dv['dim'], 1))
+            # else:
+            
+            # init from conf
+            self.x[dk] = dv['initial']
+                
+        # self.x = self.x0.copy()
+
+    def get_k_plus(self, k = 'm0', plus = 'd'):
+        """get augmented dims key from key and modification index 'plus'
+        """
+        if plus is 'd':
+            return '%s_delayline' % (k, )
+        elif plus is 'p':
+            return '%s_pre' % (k, )
+                
     def coupling_a_v_noise(self, sigma = 1e-1):
         """Pointmass2Sys.coupling_a_v_noise
 
@@ -408,52 +486,94 @@ class Pointmass2Sys(SMPSys):
         return x
     
     def step_single(self, u = None):
-        """Pointmass2Sys.step
+        """Pointmass2Sys.step_single
 
-        Compute one integration step
+        Compute one integration step of state update equation.
+
+        .. note:: order indices are reversed w.r.t. math. notation, so that order :math:`o_{i = 0}`
+                  always refers to the system's highest of integration, and :math:`o_{i = |o|}`
+                  refers to its lowest order of integration
         """
         assert u is not None
+        if not type(u) is dict:
+            u = {'m%d' % (self.order_motor, ): u.copy()}
 
         # compute acceleration noise
         self.anoise = np.random.normal(self.anoise_mean, self.anoise_std, size = (1, self.sysdim))
 
         # motor delay / lag
-        # print "self.u_delay", self.u_delay.shape, "u", u.shape
-        self.u_delay[...,[0]] = u.copy()
-        u = self.u_delay[...,[-1]].T
-        self.u_delay = np.roll(self.u_delay, shift = 1, axis = 1)
-        
-        # action
-        self.a = (u + self.anoise)/self.mass
-        # self.a = u/self.mass
-        self.a = np.dot(self.coupling_a_v, self.a.T) 
-        self.a = self.coupling_func_a_v_apply(self.a)
+        for mk, mv in [(k, v) for k, v in self.dims.items() if k[0] == 'm']:
+            dlmk = self.get_k_plus(mk, 'd')
+            premk = self.get_k_plus(mk, 'p')
+            # print "dlmk", dlmk, self.x[dlmk], "u", u
+            self.x[premk] = u[mk].copy()
+            self.x[dlmk][...,[0]] = u[mk].copy()
+            # self.x[mk] = self.x[dlmk][...,[-1]].T
+            a = self.x[dlmk][...,[-1]].T
+            self.x[dlmk] = np.roll(self.x[dlmk], shift = 1, axis = 1)
 
-        # motor out bounding
-        self.a = self.bound_motor(self.a)
+            # # print "self.u_delay", self.u_delay.shape, "u", u.shape
+            # self.u_delay[...,[0]] = u.copy()
+            # u = self.u_delay[...,[-1]].T
+            # self.u_delay = np.roll(self.u_delay, shift = 1, axis = 1)
+
+            # u = self.x['m0']
+            
+            # action: fix the motor noise
+            a = (a + self.anoise)/self.mass
+            # self.a = u/self.mass
+            a = np.dot(self.coupling_a_v, a.T)
+            a = self.coupling_func_a_v_apply(a)
+
+            # motor out bounding
+            a = self.bound_motor(a)
+            
+            self.x[mk] = a
         
         # vnoise = np.random.normal(self.vnoise_mean, self.vnoise_std,
         #                           size=(1, self.sysdim))
         # self.v_noise[i+1] = vnoise
-        
-        # 0.99 is damping / friction
-        if self.order == 2:
-            self.v = self.x[self.sysdim:self.sysdim*2] * (1 - self.friction) + (self.a * self.dt)
-            self.p = self.x[:self.sysdim] + self.v * self.dt
-        elif self.order == 1:
-            self.v = self.a
-            # this introduces saturation of position p
-            self.p = self.x[:self.sysdim] * (1 - self.friction) + (self.v * self.dt)
-            # self.p = self.x[:self.sysdim] + (self.v * self.dt)
-        elif self.order == 0:
-            self.v = self.a - (self.v * self.friction) # (self.v[i] * (1 - self.friction)) + (self.a[i+1] * self.dt) # + vnoise
-            self.p = self.a * 0.2 + self.p * 0.8
-            
-        # collect temporary state description (p,v,a) into joint state vector x
-        self.x[:self.sysdim] = self.p.copy()
-        self.x[self.sysdim:self.sysdim*2] = self.v.copy()
-        self.x[self.sysdim*2:] = self.a.copy()
+
+        # loop over system order
+        # print "self.order", self.order
+        # for o in range(self.order, -1, -1):
+        for o in range(self.order + 1):
+            ordk = 's%d' % (o,)
+            # ordk_ = 's%d' % (min(self.order, o+1),)
+            ordk_ = 's%d' % (max(0, o - 1),)
+            # print "ordk", ordk, ordk_
+            # this assumes motor input always at highest order
+            x_tm1 = self.x[ordk] * (1 - self.dims[ordk]['dissipation'])
+            # u_t = 0.
+            dx_t = (self.x[ordk_] * self.dt)
+            if ordk == ordk_: # at bottom order index / top order
+                x_tm1 = 0
+            if self.dims.has_key('m%d' % o): # have explicit input at order
+                u_t = self.x['m%d' % o] # * self.dt
+                dx_t += u_t
                 
+            # integrating
+            self.x[ordk] = x_tm1 + dx_t
+            # print "self.x[ordk]", ordk, self.x[ordk]
+                
+        # # 0.99 is damping / friction
+        # if self.order == 2:
+        #     self.v = self.x[self.sysdim:self.sysdim*2] * (1 - self.friction) + (self.a * self.dt)
+        #     self.p = self.x[:self.sysdim] + self.v * self.dt
+        # elif self.order == 1:
+        #     self.v = self.a
+        #     # this introduces saturation of position p
+        #     self.p = self.x[:self.sysdim] * (1 - self.friction) + (self.v * self.dt)
+        #     # self.p = self.x[:self.sysdim] + (self.v * self.dt)
+        # elif self.order == 0:
+        #     self.v = self.a - (self.v * self.friction) # (self.v[i] * (1 - self.friction)) + (self.a[i+1] * self.dt) # + vnoise
+        #     self.p = self.a * 0.2 + self.p * 0.8
+            
+        # # collect temporary state description (p,v,a) into joint state vector x
+        # self.x[:self.sysdim] = self.p.copy()
+        # self.x[self.sysdim:self.sysdim*2] = self.v.copy()
+        # self.x[self.sysdim*2:] = self.a.copy()
+
     # def step2(self, i, dt):
     #     """Pointmass2Sys.step2
 
@@ -558,16 +678,17 @@ class Pointmass2Sys(SMPSys):
         """
         # print "%s.step[%d] x = %s" % (self.__class__.__name__, self.cnt, x)
         # x = self.inputs['u'][0]
-        # self.apply_force(x)
         # self.step_single(self.bound_motor(x))
         self.step_single(x)
         self.cnt += 1
         # return dict of state values
-        return {'s_proprio': self.compute_sensors_proprio(),
-                's_extero':  self.compute_sensors_extero(),
-                's_all':     self.compute_sensors(),
-        }
-        
+        # return {'s_proprio': self.compute_sensors_proprio(),
+        #         's_extero':  self.compute_sensors_extero(),
+        #         's_all':     self.compute_sensors(),
+        # }
+        rdict = dict([(dk, self.compute_sensors(dk)) for dk in self.dims.keys()])
+        return rdict
+
     def bound_motor(self, m):
         """Pointmass2Sys.bound_motor
 
@@ -575,59 +696,28 @@ class Pointmass2Sys(SMPSys):
         """
         return np.clip(m, self.force_min, self.force_max)
 
-    def apply_force(self, u):
-        """control pointmass with force command (2nd order)"""
-        # print "u", u, self.mass, u/self.mass
-        # FIXME: insert motor transfer function
-        a = (u/self.mass).reshape((self.sysdim, 1))
-        # a = (u/self.mass).reshape((self.sysdim, 1)) - self.x[:self.sysdim,[0]] * 0.025 # experimental for homeokinesis hack
-        # a += np.random.normal(0.05, 0.01, a.shape)
-
-        # world modification
-        if np.any(self.x[:self.sysdim] > 0):
-            a += np.random.normal(0.05, 0.01, a.shape)
-        else:
-            a += np.random.normal(-0.1, 0.01, a.shape)
-            
-        # print("a.shape", a.shape)
-        # print "a", a, self.x[self.conf.s_ndims/2:]
-        v = self.x[self.sysdim:self.sysdim*2] * (1 - self.friction) + a * self.dt
-        
-        # self.a_ = a.copy()
-        
-        
-        # # world modification
-        # v += np.sin(self.cnt * 0.01) * 0.05
-        
-        # print "v", v
-        p = self.x[:self.sysdim] + v * self.dt
-
-        # collect temporary state description (p,v,a) into joint state vector x
-        self.x[:self.sysdim] = p.copy()
-        self.x[self.sysdim:self.sysdim*2] = v.copy()
-        self.x[self.sysdim*2:] = a.copy()
-
-        # apply noise
-        # self.x += self.sysnoise * np.random.randn(self.x.shape[0], self.x.shape[1])
-        
-        # print "self.x[2,0]", self.x[2,0]
-
-        # self.scale()
-        # self.pub()                
-        self.cnt += 1
-        
-        # return x
-        # self.x = x # pointmasslib.simulate(self.x, [u], self.dt)
-
     def compute_sensors_proprio(self):
-        return self.x[self.sysdim*2:]
+        """Pointmass2Sys.compute_sensors_proprio"""
+        # return self.x[self.sysdim*2:]
+        return self.x['s0']
     
     def compute_sensors_extero(self):
-        return self.x[self.sysdim:self.sysdim*2]
+        """Pointmass2Sys.compute_sensors_extero"""
+        if self.order > 0:
+            return self.x['s1'] # self.x[self.sysdim:self.sysdim*2]
+        else:
+            return np.zeros_like(self.x['s0'])
     
-    def compute_sensors(self):
-        """compute the proprio and extero sensor values from state"""
-        return self.x
+    def compute_sensors(self, k = None):
+        """Pointmass2Sys.compute_sensors
+
+        Compute the proprio and extero sensor values from ground truth state
+        """
+        if k is None:
+            return np.vstack((self.compute_sensors_proprio(), self.compute_sensors_extero())) # self.x
+
+        if not k.endswith('delayline'):
+            return self.x[k]
     
 ################################################################################
 # simple arm system, from explauto
