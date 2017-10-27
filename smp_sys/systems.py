@@ -1,5 +1,9 @@
 """**smp_sys.systems**
 
+.. moduleauthor:: Oswald Berthold, 2017
+
+Depends: numpy, smp_base
+
 A system in the smp framework is any thing that can be packed into a
 box with inputs and outputs and some kind of internal activity that
 transforms inputs into outputs. We distinguish open-loop systems (OLS)
@@ -22,6 +26,8 @@ essential parameters or system properties which control the degrees of
 difficulty of the explanation problems. This implies systematic
 knowledge of problem difficulty and systematic knowledge of adequate
 agents for a given level of difficulty.
+
+Current systems in here are all closed-loop ones and include :class:`SMPSys`, :class:`PointmassSys`, :class:`Pointmass2Sys`, :class:`smp_sys.BhaSimulatedSys`, :class:`smp_sys.STDRCircularSys`, :class:`smp_sys.LPZBarrelSys`, :class:`smp_sys.SpheroSys`.
 
 TODO:
  - fix order 0 to be zero, pm and others, intrinsic order for 'real' systems
@@ -129,7 +135,7 @@ class SMPSys(object):
 ################################################################################
 # point mass system simple
 class PointmassSys(SMPSys):
-    """PointmassSys
+    """Pointmass system class
 
     A point mass system (pm), which is an abstract model of a rigid
     body robot in an n-dimensional isotropic space. The robot's state
@@ -259,7 +265,6 @@ class PointmassSys(SMPSys):
     def compute_sensors(self):
         """compute the proprio and extero sensor values from state"""
         return self.x
-
 
 class Pointmass2Sys(SMPSys):
     """Pointmass2Sys
