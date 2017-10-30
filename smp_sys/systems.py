@@ -27,7 +27,10 @@ difficulty of the explanation problems. This implies systematic
 knowledge of problem difficulty and systematic knowledge of adequate
 agents for a given level of difficulty.
 
-Current systems in here are all closed-loop ones and include :class:`SMPSys`, :class:`PointmassSys`, :class:`Pointmass2Sys`, :class:`smp_sys.BhaSimulatedSys`, :class:`smp_sys.STDRCircularSys`, :class:`smp_sys.LPZBarrelSys`, :class:`smp_sys.SpheroSys`.
+Current systems in here are all closed-loop ones and include
+:class:`SMPSys`, :class:`PointmassSys`, :class:`Pointmass2Sys`,
+:class:`smp_sys.BhaSimulatedSys`, :class:`smp_sys.STDRCircularSys`,
+:class:`smp_sys.LPZBarrelSys`, :class:`smp_sys.SpheroSys`.
 
 TODO:
  - fix order 0 to be zero, pm and others, intrinsic order for 'real' systems
@@ -403,6 +406,8 @@ class Pointmass2Sys(SMPSys):
         # for f_ in self.coupling_func_a_v:
         #     print "f_", type(f_), f_.__name__, f_(x = 10.0)
         # print "coupling_func_a_v", type(self.coupling_func_a_v)
+        if self.order == 0:
+            self.x['s1'] = self.x['s0']
 
     def check_dims_order(self):
         """check_dims
@@ -555,7 +560,7 @@ class Pointmass2Sys(SMPSys):
             # integrating
             self.x[ordk] = x_tm1 + dx_t
             # print "self.x[ordk]", ordk, self.x[ordk]
-                
+            
         # # 0.99 is damping / friction
         # if self.order == 2:
         #     self.v = self.x[self.sysdim:self.sysdim*2] * (1 - self.friction) + (self.a * self.dt)
@@ -687,6 +692,8 @@ class Pointmass2Sys(SMPSys):
         #         's_all':     self.compute_sensors(),
         # }
         rdict = dict([(dk, self.compute_sensors(dk)) for dk in self.dims.keys()])
+        if self.order == 0:
+            rdict['s1'] = self.x['s0']
         return rdict
 
     def bound_motor(self, m):
@@ -703,7 +710,7 @@ class Pointmass2Sys(SMPSys):
     
     def compute_sensors_extero(self):
         """Pointmass2Sys.compute_sensors_extero"""
-        if self.order > 0:
+        if self.order > 0: # and self.x.has_key('s1'):
             return self.x['s1'] # self.x[self.sysdim:self.sysdim*2]
         else:
             return np.zeros_like(self.x['s0'])
