@@ -423,7 +423,7 @@ class Pointmass2Sys(SMPSys):
 
     def check_dims_motor(self):
         mks = [k for k in self.dims.keys() if k.startswith('m')]
-        print "motor keys = %s" % (mks, )
+        # print "motor keys = %s" % (mks, )
         # no motor definitions
         if len(mks) < 1:
             # add default motor at order 0
