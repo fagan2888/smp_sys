@@ -51,14 +51,23 @@ TODO:
 #    - explauto/explauto/environment/pointmass/pointmass.py
 #    - smq/smq/robots.py
 
+# abstract style
 # smp/smp/arm: kinematic, dynamic
 # smp_sphero/sphero: wheels, angle/vel, x/y
 # smq/smq/arm
+# bha model
+# pendel
+# cartpole
+# doppelwippe
+# doppelpendel
+
+# real style
 # smq/smq/stdr
 # smp/morse_work/atrv
 # smp/morse_work/turtlebot
 # smp/morse_work/quadrotor
-# bha model
+# real copter
+# festo linear actuator
 # ntrtsim
 # malmo
 
@@ -506,15 +515,29 @@ class Pointmass2Sys(SMPSys):
         # compute acceleration noise
         self.anoise = np.random.normal(self.anoise_mean, self.anoise_std, size = (1, self.sysdim))
 
-        # motor delay / lag
+        # apply motor delay / lag
+        # iterate over motor groups (vectors) of motor variables
+        #  - transforming a predicted value into a measured value
+        #  - by applying a channel-specific (vector component) delay
+        #  - by applying a transfer function (lookup table, distortion d, smoothness s)
+        #  - by applying constraints (self limits)
+        #  - by adding entropy
         for mk, mv in [(k, v) for k, v in self.dims.items() if k[0] == 'm']:
+            # get delayed motor prediction key
             dlmk = self.get_k_plus(mk, 'd')
+            # get instantaneous motor measurement key
             premk = self.get_k_plus(mk, 'p')
             # print "dlmk", dlmk, self.x[dlmk], "u", u
+
+            # store current prediction and feed it into delay line
             self.x[premk] = u[mk].copy()
             self.x[dlmk][...,[0]] = u[mk].copy()
             # self.x[mk] = self.x[dlmk][...,[-1]].T
+
+            # get delayed prediction data
             a = self.x[dlmk][...,[-1]].T
+
+            # update delay line by one step
             self.x[dlmk] = np.roll(self.x[dlmk], shift = 1, axis = 1)
 
             # # print "self.u_delay", self.u_delay.shape, "u", u.shape
@@ -524,15 +547,19 @@ class Pointmass2Sys(SMPSys):
 
             # u = self.x['m0']
             
-            # action: fix the motor noise
+            # apply intrinsice motor noise and divide by mass to get net force
             a = (a + self.anoise)/self.mass
             # self.a = u/self.mass
+
+            # apply coupling transformation
             a = np.dot(self.coupling_a_v, a.T)
+            # apply component-wise transfer func
             a = self.coupling_func_a_v_apply(a)
 
-            # motor out bounding
+            # apply self limits / motor out bounding
             a = self.bound_motor(a)
-            
+
+            # update internal state
             self.x[mk] = a
         
         # vnoise = np.random.normal(self.vnoise_mean, self.vnoise_std,
