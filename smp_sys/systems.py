@@ -411,10 +411,13 @@ class Pointmass2Sys(SMPSys):
             
         # randomly select a transfer function for each dimension
         self.coupling_func_a_v = np.random.choice(self.coupling_funcs, self.sysdim)
+        
         # debugging coupling transfer functions
         # for f_ in self.coupling_func_a_v:
         #     print "f_", type(f_), f_.__name__, f_(x = 10.0)
         # print "coupling_func_a_v", type(self.coupling_func_a_v)
+
+        # special case order 0
         if self.order == 0:
             self.x['s1'] = self.x['s0']
 
