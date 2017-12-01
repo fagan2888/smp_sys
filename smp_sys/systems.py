@@ -396,9 +396,11 @@ class Pointmass2Sys(SMPSys):
 
         ############################################################
         # motor to force coupling: f = h(C * a), with coupling matrix C and transfer function h
+        # FIXME: better coupling is a tensor with shape C x lookup-length, or matrix of functions
         # coupling matrix C, default is Identity
         self.coupling_a_v = np.eye(self.sysdim)
-        # non-identity coupling
+        
+        # add noise to coupling matrix
         self.coupling_a_v_noise(sigma = self.coupling_sigma)
 
         # coupling transfer functions
@@ -425,13 +427,15 @@ class Pointmass2Sys(SMPSys):
         """check_dims
 
         Make sure dims spec is complete
-         - variable description 'dims' matches with order and has an sN entry for every N in [0, ..., order]
+         - :attr:`dims` requires an sN entry for every N in [0, ..., order]
         """
+        # scan order indices
         for o in range(self.order + 1):
             ordk = 's%d' % (o, )
+            # add dim if necessary
             if not self.dims.has_key(ordk):
                 self.dims[ordk] = {'dim': self.sysdim, 'dist': float(o), 'initial': np.random.uniform(-1, 1, (self.sysdim, 1))}
-                print "adding variable %s = %s to comply with system order %d" % (ordk, self.dims[ordk], self.order)
+                self._debug("adding variable %s = %s to comply with system order %d" % (ordk, self.dims[ordk], self.order))
 
     def check_dims_motor(self):
         mks = [k for k in self.dims.keys() if k.startswith('m')]
