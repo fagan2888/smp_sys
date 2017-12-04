@@ -80,7 +80,14 @@ import copy
 from functools import partial
 import numpy as np
 
+# import transfer functions: linear, nonlin_1, nonlin_2, ...
 from smp_base.funcs import *
+# model funcs from smp_graphs
+from smp_graphs.funcs_models import model
+
+import logging
+from smp_base.common import get_module_logger
+logger = get_module_logger(modulename = 'systems', loglevel = logging.DEBUG - 0)
 
 class SMPSys(object):
     """SMPSys class
@@ -315,7 +322,7 @@ class Pointmass2Sys(SMPSys):
         'order': 0,
         'dims': {
             # 'm0': {'dim': 1, 'dist': 0, 'initial': np.zeros((1, 1)), 'lag': 1},
-            's0': {'dim': 1, 'dist': 0, 'initial': np.random.uniform(-1.0, 1.0, (1, 1))},
+            's0': {'dim': 1, 'dist': 0, 'initial': np.random.uniform(-1.0, 1.0, (1, 1)), }, # mins, maxs
         },
         'x': {},
         'lag': 1,
@@ -325,7 +332,7 @@ class Pointmass2Sys(SMPSys):
         'a0': np.random.uniform(-0.3, 0.3, (3, 1)),
         'v0': np.random.uniform(-0.3, 0.3, (3, 1)),
         'x0': np.random.uniform(-0.3, 0.3, (3, 1)),
-        'statedim': 3,
+        # 'statedim': 3,
         'forcefield': False,
         'coupling_sigma': 1e-9,
         'transfer': False,
@@ -345,45 +352,13 @@ class Pointmass2Sys(SMPSys):
         - conf: configuration dictionary
         -- mass: point _mass_
         -- sysdim: dimension of system, usually 1,2, or 3D
-        -- statedim: 1d pointmass has 3 variables (pos, vel, acc) in this model, so sysdim * 3
         -- dt: integration time step
         -- x0: initial state
         -- order: not implemented (control mode of the system, order = 0 kinematic, 1 velocity, 2 force)
+        # -- statedim: 1d pointmass has 3 variables (pos, vel, acc) in this model, so sysdim * 3
         """
         # init parent, set defaults and update with config
         SMPSys.__init__(self, conf)
-
-        # print "pm init", self.sysdim, self.statedim, conf['sysdim']
-        
-        # # initial states
-        
-        # if not hasattr(self, 'x0'):
-        #     self.x0 = np.zeros((self.statedim, 1))
-            
-        # self.x  = self.x0.copy()
-        # self.cnt = 0
-
-        # bla = dict(a0=0., v0=0., x0=0.,
-        #     numsteps=1000, dt=1, dim=2,
-        #     alag=20, mass = 1.0, order = 2, forcefield = False,
-        #     motortransfer = False, controller = False,
-        #     coupling_sigma = 1e-9,
-        #     transfer = False)
-        # print "bla", bla
-        
-        # # state vectors
-        # self.a       = np.zeros((self.sysdim, 1))
-        # # self.a_noise = np.zeros((self.sysdim, 1))
-        # self.v       = np.zeros((self.sysdim, 1))
-        # # self.v_noise = np.zeros((self.sysdim, 1))
-        # self.x       = np.zeros((self.sysdim, 1))
-
-        
-        # self.u       = np.zeros((self.sysdim, 1))
-        # command buffer to simulate motor delay
-        
-        # self.u_delay = np.zeros((self.sysdim, self.lag + 1)) # lag 1 implies two time steps
-        # print "u_delay", self.u_delay.shape
 
         # make sure variable description matches with order
         self.check_dims_order()
@@ -407,7 +382,38 @@ class Pointmass2Sys(SMPSys):
         # self.transfer = transfer
         if self.transfer > 0:
             # self.coupling_funcs = [partial(f, a = np.random.uniform(-1, 1), b = np.random.uniform(-1, 1)) for f in [linear, nonlin_1, nonlin_3]] # nonlin_2, 
-            self.coupling_funcs = [linear, nonlin_1, nonlin_2, nonlin_3]
+            # self.coupling_funcs = [linear, nonlin_1, nonlin_2, nonlin_3]
+            mconf = {
+                'type': 'random_lookup',
+                'numelem': self.numelem, # sampling grid
+                'l_a': 0.0,
+                'd_a': 0.98,
+                'd_s': 0.5,
+                's_a': 0.02,
+                's_f': 2.0,
+                'e': 0.0,
+            }
+            conf = {
+                'params': {
+                    'inputs': {
+                        'x': {'shape': (self.sysdim, 1)},
+                    },
+                },
+            }
+            class bla(object):
+                pass
+            self.ref = bla()
+            setattr(self.ref, 'inputs', {'x': {'val': np.zeros((self.sysdim, 1))}})
+            setattr(self.ref, 'y', np.zeros((self.sysdim, 1)))
+            self.mref = bla()
+            setattr(self.mref, 'x', self.ref.inputs['x']['val'])
+            setattr(self.mref, 'y', self.ref.y)
+            # self.ref.inputs['x']['val'][i] = x[i]
+            self.transfer_model  = model(ref = self.ref, conf = conf, mref = self.mref, mconf = mconf)
+            self.transfer_lookup = [partial(self.transfer_model.predict, ref = self.ref)]
+            # self.coupling_funcs = [linear, nonlin_1, nonlin_2, nonlin_3] + self.transfer_lookup
+            logger.debug('transfer_lookup = %s', self.transfer_lookup)
+            self.coupling_funcs = self.transfer_lookup
         else:
             self.coupling_funcs = [identity]
             
@@ -502,8 +508,15 @@ class Pointmass2Sys(SMPSys):
 
         Element-wise func application
         """
+        logger.debug('coupling_func_a_v_apply x = %s', x)
         for i in range(self.sysdim):
-            x[i] = self.coupling_func_a_v[i](x[i])
+            # x[i] = self.coupling_func_a_v[i](x[i])
+            self.ref.inputs['x']['val'][i] = x[i]
+            logger.debug('coupling_func_a_v_apply x[%d] = %s, ref.y[%d] = %s, mref.y[%d] = %s', i, x[i], i, self.ref.y[i], i, self.mref.y[i])
+            self.coupling_func_a_v[i](ref = self.ref)
+            logger.debug('coupling_func_a_v_apply x[%d] = %s, ref.y[%d] = %s', i, x[i], i, self.ref.y[i])
+            x[i] = self.ref.y[i]
+        logger.debug('coupling_func_a_v_apply x = %s, y = %s', x, self.ref.y[i])
         return x
     
     def step_single(self, u = None):
