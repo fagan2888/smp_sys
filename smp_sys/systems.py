@@ -400,17 +400,29 @@ class Pointmass2Sys(SMPSys):
                     },
                 },
             }
+
+            # dummy block ref
             class bla(object):
                 pass
+            
             self.ref = bla()
+            setattr(self.ref, 'cnt', 0)
             setattr(self.ref, 'inputs', {'x': {'val': np.zeros((self.sysdim, 1))}})
             setattr(self.ref, 'y', np.zeros((self.sysdim, 1)))
-            self.mref = bla()
-            setattr(self.mref, 'x', self.ref.inputs['x']['val'])
-            setattr(self.mref, 'y', self.ref.y)
+            # self.mref = bla()
+            # setattr(self.mref, 'x', self.ref.inputs['x']['val'].copy())
+            # setattr(self.mref, 'y', self.ref.y.copy())
             # self.ref.inputs['x']['val'][i] = x[i]
-            self.transfer_model  = model(ref = self.ref, conf = conf, mref = self.mref, mconf = mconf)
-            self.transfer_lookup = [partial(self.transfer_model.predict, ref = self.ref)]
+            self.transfer_model  = model(ref = self.ref, conf = conf, mref = 'random_lookup', mconf = mconf)
+            self.transfer_lookup = [
+                partial(
+                    self.transfer_model.predict2,
+                    self.ref,
+                    self.transfer_model
+                    # ref = self.ref,
+                    # mref = self.transfer_model
+                )
+            ]
             # self.coupling_funcs = [linear, nonlin_1, nonlin_2, nonlin_3] + self.transfer_lookup
             logger.debug('transfer_lookup = %s', self.transfer_lookup)
             self.coupling_funcs = self.transfer_lookup
@@ -473,7 +485,8 @@ class Pointmass2Sys(SMPSys):
             if dk[0] == 'm': # dk.startswith('m'):
                 # fix missing lag
                 if not dv.has_key('lag'):
-                    dv['lag'] = 1
+                    # print "    setting missing dim lag to global lag = %d" % (self.lag, )
+                    dv['lag'] = self.lag
                 # add motor delayline entry
                 self.x[self.get_k_plus(dk, 'd')] = np.zeros((dv['dim'], dv['lag'] + 1))
                 # add predicted motor entry (the input)
@@ -508,15 +521,20 @@ class Pointmass2Sys(SMPSys):
 
         Element-wise func application
         """
-        logger.debug('coupling_func_a_v_apply x = %s', x)
+        # logger.debug('coupling_func_a_v_apply x = %s', x)
         for i in range(self.sysdim):
-            # x[i] = self.coupling_func_a_v[i](x[i])
-            self.ref.inputs['x']['val'][i] = x[i]
-            logger.debug('coupling_func_a_v_apply x[%d] = %s, ref.y[%d] = %s, mref.y[%d] = %s', i, x[i], i, self.ref.y[i], i, self.mref.y[i])
-            self.coupling_func_a_v[i](ref = self.ref)
-            logger.debug('coupling_func_a_v_apply x[%d] = %s, ref.y[%d] = %s', i, x[i], i, self.ref.y[i])
-            x[i] = self.ref.y[i]
-        logger.debug('coupling_func_a_v_apply x = %s, y = %s', x, self.ref.y[i])
+            # legacy transfer funcs
+            x[i] = self.coupling_func_a_v[i](x[i])
+
+            # # lookup transfer from funcs_models
+            # self.ref.inputs['x']['val'][i] = x[i].copy()
+            # # logger.debug('coupling_func_a_v_apply x[%d] = %s, ref.inputs[\'x\'] = %s, ref.y[%d] = %s, mref.y[%d] = %s', i, x[i], self.ref.inputs['x'], i, self.ref.y[i], i, self.mref.y[i])
+            # # self.coupling_func_a_v[i](ref = self.ref)
+            # self.coupling_func_a_v[i]()
+            # # logger.debug('coupling_func_a_v_apply x[%d] = %s, mref.y[%d] = %s', i, x[i], i, self.mref.y[i])
+            # # x[i] = self.mref.y[i].copy()
+            
+        # logger.debug('coupling_func_a_v_apply x = %s, mref.y = %s', x, self.transfer_model.y[i])
         return x
     
     def step_single(self, u = None):
@@ -559,14 +577,8 @@ class Pointmass2Sys(SMPSys):
 
             # update delay line by one step
             self.x[dlmk] = np.roll(self.x[dlmk], shift = 1, axis = 1)
-
-            # # print "self.u_delay", self.u_delay.shape, "u", u.shape
-            # self.u_delay[...,[0]] = u.copy()
-            # u = self.u_delay[...,[-1]].T
-            # self.u_delay = np.roll(self.u_delay, shift = 1, axis = 1)
-
-            # u = self.x['m0']
-            
+            # print "    sys.step_single self.x[dlmk = %s] = %s" % (dlmk, self.x[dlmk])
+                        
             # apply intrinsice motor noise and divide by mass to get net force
             a = (a + self.anoise)/self.mass
             # self.a = u/self.mass
