@@ -424,7 +424,7 @@ class Pointmass2Sys(SMPSys):
                 )
             ]
             # self.coupling_funcs = [linear, nonlin_1, nonlin_2, nonlin_3] + self.transfer_lookup
-            logger.debug('transfer_lookup = %s', self.transfer_lookup)
+            # logger.debug('transfer_lookup = %s', self.transfer_lookup)
             self.coupling_funcs = self.transfer_lookup
         else:
             self.coupling_funcs = [identity]
@@ -485,12 +485,13 @@ class Pointmass2Sys(SMPSys):
             if dk[0] == 'm': # dk.startswith('m'):
                 # fix missing lag
                 if not dv.has_key('lag'):
-                    # print "    setting missing dim lag to global lag = %d" % (self.lag, )
+                    # logger.debug("        dimv is missing lag param, setting dimv.lag to global lag = %d" % (self.lag, ))
                     dv['lag'] = self.lag
                 # add motor delayline entry
                 self.x[self.get_k_plus(dk, 'd')] = np.zeros((dv['dim'], dv['lag'] + 1))
                 # add predicted motor entry (the input)
                 self.x[self.get_k_plus(dk, 'p')] = np.zeros((dv['dim'], 1))
+                logger.debug("        dimv.lag = %d" % (dv['lag'], ))
             # else:
             
             # init from conf
@@ -573,51 +574,67 @@ class Pointmass2Sys(SMPSys):
             # self.x[mk] = self.x[dlmk][...,[-1]].T
 
             # get delayed prediction data
-            a = self.x[dlmk][...,[-1]].T
+            # logger.debug("    step_single motor loop motorkey = %s, x[motorkey_delay] = %s, lag = %s", mk, self.x[dlmk], mv['lag'])
+            a = self.x[dlmk][...,[-1]].T.copy()
+            # logger.debug("    step_single motor loop motorkey = %s,             raw a = %s", mk, a)
 
             # update delay line by one step
-            self.x[dlmk] = np.roll(self.x[dlmk], shift = 1, axis = 1)
-            # print "    sys.step_single self.x[dlmk = %s] = %s" % (dlmk, self.x[dlmk])
+            shift_ = 1
+            self.x[dlmk] = np.roll(self.x[dlmk], shift = shift_, axis = 1)
+            # logger.debug("    step_single motor loop motorkey = %s, x[motorkey_delay] = %s, shift = %s", mk, self.x[dlmk], shift_)
                         
             # apply intrinsice motor noise and divide by mass to get net force
             a = (a + self.anoise)/self.mass
-            # self.a = u/self.mass
+            # logger.debug("    step_single motor loop motorkey = %s, norm a = %s", mk, a)
 
             # apply coupling transformation
             a = np.dot(self.coupling_a_v, a.T)
+            # logger.debug("    step_single motor loop motorkey = %s,  dot a = %s", mk, a)
+            
             # apply component-wise transfer func
             a = self.coupling_func_a_v_apply(a)
+            # logger.debug("    step_single motor loop motorkey = %s, tran a = %s", mk, a)
 
             # apply self limits / motor out bounding
             a = self.bound_motor(a)
+            # logger.debug("    step_single motor loop motorkey = %s, boun a = %s", mk, a)
 
             # update internal state
-            self.x[mk] = a
+            # logger.debug("    step_single motor loop motorkey = %s, motorval = %s, motorlag = %s", mk, self.x[mk], mv['lag'])
+            self.x[mk] = a.copy()
         
         # vnoise = np.random.normal(self.vnoise_mean, self.vnoise_std,
         #                           size=(1, self.sysdim))
         # self.v_noise[i+1] = vnoise
 
-        # loop over system order
-        # print "self.order", self.order
-        # for o in range(self.order, -1, -1):
+        # integrate system: loop over system order
         for o in range(self.order + 1):
             ordk = 's%d' % (o,)
             # ordk_ = 's%d' % (min(self.order, o+1),)
             ordk_ = 's%d' % (max(0, o - 1),)
             # print "ordk", ordk, ordk_
+            
             # this assumes motor input always at highest order
-            x_tm1 = self.x[ordk] * (1 - self.dims[ordk]['dissipation'])
+            self.x[ordk] *= 1 - self.dims[ordk]['dissipation']
+            x_tm1 = self.x[ordk]
             # u_t = 0.
-            dx_t = (self.x[ordk_] * self.dt)
+            dx_t = (self.x[ordk_].copy() * self.dt)
             if ordk == ordk_: # at bottom order index / top order
                 x_tm1 = 0
+                
             if self.dims.has_key('m%d' % o): # have explicit input at order
-                u_t = self.x['m%d' % o] # * self.dt
+                mk_ = 'm%d' % (max(0, o - 1), )
+                orddlmk = mk_
+                # orddlmk = self.get_k_plus(mk_, 'd') # 'm%d' % (max(0, o - 1), )
+                u_t = self.x[orddlmk] # * self.dt
+                # logger.debug("        step_single order loop motorkey = %s, motorval = %s, dx_t = %s, u_t = %s", orddlmk, self.x[orddlmk], dx_t, u_t)
                 dx_t += u_t
+                
+                # logger.debug("        step_single order loop motorkey = %s, dx_t = %s", orddlmk, dx_t)
                 
             # integrating
             self.x[ordk] = x_tm1 + dx_t
+            # logger.debug("    step_single order loop orderkey = %s, sensorval = %s = %s + %s", ordk, self.x[ordk], x_tm1, dx_t)
             # print "self.x[ordk]", ordk, self.x[ordk]
             
         # # 0.99 is damping / friction
@@ -740,6 +757,7 @@ class Pointmass2Sys(SMPSys):
 
         One update step and return system dict
         """
+        # logger.debug("    step[%d]                  x = %s", self.cnt, x)
         # print "%s.step[%d] x = %s" % (self.__class__.__name__, self.cnt, x)
         # x = self.inputs['u'][0]
         # self.step_single(self.bound_motor(x))
@@ -751,8 +769,10 @@ class Pointmass2Sys(SMPSys):
         #         's_all':     self.compute_sensors(),
         # }
         rdict = dict([(dk, self.compute_sensors(dk)) for dk in self.dims.keys()])
+        # legacy hack
         if self.order == 0:
             rdict['s1'] = self.x['s0']
+        # logger.debug("    step        rdict['s0'] = %s", rdict['s0'])
         return rdict
 
     def bound_motor(self, m):
