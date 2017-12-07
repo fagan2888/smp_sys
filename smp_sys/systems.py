@@ -89,6 +89,10 @@ import logging
 from smp_base.common import get_module_logger
 logger = get_module_logger(modulename = 'systems', loglevel = logging.DEBUG - 0)
 
+# dummy block ref
+class bla(object):
+    pass
+
 class SMPSys(object):
     """SMPSys class
 
@@ -335,7 +339,7 @@ class Pointmass2Sys(SMPSys):
         # 'statedim': 3,
         'forcefield': False,
         'coupling_sigma': 1e-9,
-        'transfer': False,
+        'transfer': False, # integer index, 0 means identity
         'force_max':  1.0,
         'force_min': -1.0,
         'friction': 0.001, # 0.012
@@ -379,58 +383,28 @@ class Pointmass2Sys(SMPSys):
         self.coupling_a_v_noise(sigma = self.coupling_sigma)
 
         # coupling transfer functions
-        # self.transfer = transfer
-        if self.transfer > 0:
-            # self.coupling_funcs = [partial(f, a = np.random.uniform(-1, 1), b = np.random.uniform(-1, 1)) for f in [linear, nonlin_1, nonlin_3]] # nonlin_2, 
-            # self.coupling_funcs = [linear, nonlin_1, nonlin_2, nonlin_3]
-            mconf = {
-                'type': 'random_lookup',
-                'numelem': self.numelem, # sampling grid
-                'l_a': 0.0,
-                'd_a': 0.98,
-                'd_s': 0.5,
-                's_a': 0.02,
-                's_f': 2.0,
-                'e': 0.0,
-            }
-            conf = {
-                'params': {
-                    'inputs': {
-                        'x': {'shape': (self.sysdim, 1)},
-                    },
-                },
-            }
+        self.transfer = int(self.transfer)
+        self.coupling_funcs_all = [
+            [identity],
+            [partial(f, a = np.random.uniform(-1, 1), b = np.random.uniform(-1, 1)) for f in [linear, nonlin_1, nonlin_3]], # nonlin_2,
+            [linear, nonlin_1, nonlin_2, nonlin_3],
+            self.get_transfer_lookup(),
+        ]
+        
+        # if self.transfer > 0:
+        #     self.coupling_funcs_1 = 
+        #     self.coupling_funcs_2 = 
 
-            # dummy block ref
-            class bla(object):
-                pass
-            
-            self.ref = bla()
-            setattr(self.ref, 'cnt', 0)
-            setattr(self.ref, 'inputs', {'x': {'val': np.zeros((self.sysdim, 1))}})
-            setattr(self.ref, 'y', np.zeros((self.sysdim, 1)))
-            # self.mref = bla()
-            # setattr(self.mref, 'x', self.ref.inputs['x']['val'].copy())
-            # setattr(self.mref, 'y', self.ref.y.copy())
-            # self.ref.inputs['x']['val'][i] = x[i]
-            self.transfer_model  = model(ref = self.ref, conf = conf, mref = 'random_lookup', mconf = mconf)
-            self.transfer_lookup = [
-                partial(
-                    self.transfer_model.predict2,
-                    self.ref,
-                    self.transfer_model
-                    # ref = self.ref,
-                    # mref = self.transfer_model
-                )
-            ]
-            # self.coupling_funcs = [linear, nonlin_1, nonlin_2, nonlin_3] + self.transfer_lookup
-            # logger.debug('transfer_lookup = %s', self.transfer_lookup)
-            self.coupling_funcs = self.transfer_lookup
-        else:
-            self.coupling_funcs = [identity]
+        #     # self.coupling_funcs = [linear, nonlin_1, nonlin_2, nonlin_3] + self.transfer_lookup
+        #     # logger.debug('transfer_lookup = %s', self.transfer_lookup)
+        #     self.coupling_funcs = self.transfer_lookup + self.coupling_funcs_1
+        # else:
+        #     self.coupling_funcs = [identity]
             
         # randomly select a transfer function for each dimension
-        self.coupling_func_a_v = np.random.choice(self.coupling_funcs, self.sysdim)
+        assert self.transfer < len(self.coupling_funcs_all), "systems.Pointmass2Sys transfer = %s >= len(transfer_list) = %s" % (self.transfer, len(self.coupling_funcs_all))
+        self.coupling_func_a_v = np.random.choice(self.coupling_funcs_all[self.transfer], self.sysdim)
+        logger.debug("    transfer function choice = %s" % (self.coupling_func_a_v, ))
         
         # debugging coupling transfer functions
         # for f_ in self.coupling_func_a_v:
@@ -441,6 +415,57 @@ class Pointmass2Sys(SMPSys):
         if self.order == 0:
             self.x['s1'] = self.x['s0']
 
+    def get_transfer_lookup(self):
+        self.ref = bla()
+        setattr(self.ref, 'cnt', 0)
+        setattr(self.ref, 'inputs', {'x': {'val': np.zeros((self.sysdim, 1))}})
+        setattr(self.ref, 'y', np.zeros((self.sysdim, 1)))
+        # self.mref = bla()
+        # setattr(self.mref, 'x', self.ref.inputs['x']['val'].copy())
+        # setattr(self.mref, 'y', self.ref.y.copy())
+        # self.ref.inputs['x']['val'][i] = x[i]
+        self.transfer_model = []
+        self.transfer_lookup = []
+        # loop over system dimensions / motor dimensions
+        for sysdim_ in range(self.sysdim):
+            # FIXME: model.get_random_conf()
+            d_a = np.random.uniform(0.8, 0.98)
+            l_a = np.random.uniform(0.0, 1 - d_a)
+            s_a = np.random.uniform(0.0, 1 - d_a - l_a)
+            e_a = np.random.uniform(0.0, 1 - d_a - l_a - s_a)
+            mconf = {
+                'type': 'random_lookup',
+                'numelem': self.numelem, # sampling grid
+                'l_a': l_a, # 0.0,
+                'd_a': d_a, # 0.98,
+                'd_s': 0.75,
+                's_a': s_a,
+                's_f': 2.0,
+                'e': e_a,
+            }
+            logger.debug("    mconf = %s" % (mconf, ))
+            # FIXME: model.get_block_random_conf()
+            conf = {
+                'params': {
+                    'inputs': {
+                        'x': {'shape': (self.sysdim, 1)},
+                        },
+                    },
+                }
+                        
+            self.transfer_model.append(model(ref = self.ref, conf = conf, mref = 'random_lookup', mconf = mconf))
+            self.transfer_lookup.append(
+                partial(
+                    self.transfer_model[-1].predict2,
+                    self.ref,
+                    self.transfer_model[-1]
+                    # ref = self.ref,
+                    # mref = self.transfer_model
+                )
+            )
+
+            return self.transfer_lookup
+            
     def check_dims_order(self):
         """check_dims
 
