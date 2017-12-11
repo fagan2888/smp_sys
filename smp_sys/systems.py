@@ -87,7 +87,7 @@ from smp_graphs.funcs_models import model
 
 import logging
 from smp_base.common import get_module_logger
-logger = get_module_logger(modulename = 'systems', loglevel = logging.DEBUG - 0)
+logger = get_module_logger(modulename = 'systems', loglevel = logging.INFO)
 
 # dummy block ref
 class bla(object):
@@ -443,7 +443,7 @@ class Pointmass2Sys(SMPSys):
                 's_f': 2.0,
                 'e': e_a,
             }
-            logger.debug("    mconf = %s" % (mconf, ))
+            # logger.debug("    mconf = %s" % (mconf, ))
             # FIXME: model.get_block_random_conf()
             conf = {
                 'params': {
@@ -516,7 +516,7 @@ class Pointmass2Sys(SMPSys):
                 self.x[self.get_k_plus(dk, 'd')] = np.zeros((dv['dim'], dv['lag'] + 1))
                 # add predicted motor entry (the input)
                 self.x[self.get_k_plus(dk, 'p')] = np.zeros((dv['dim'], 1))
-                logger.debug("        dimv.lag = %d" % (dv['lag'], ))
+                # logger.debug("        dimv.lag = %d" % (dv['lag'], ))
             # else:
             
             # init from conf
