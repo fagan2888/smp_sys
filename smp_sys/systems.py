@@ -438,7 +438,7 @@ class Pointmass2Sys(SMPSys):
                 'numelem': self.numelem, # sampling grid
                 'l_a': l_a, # 0.0,
                 'd_a': d_a, # 0.98,
-                'd_s': 0.75,
+                'd_s': 0.3,
                 's_a': s_a,
                 's_f': 2.0,
                 'e': e_a,
