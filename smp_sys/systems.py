@@ -82,7 +82,7 @@ import numpy as np
 
 # import transfer functions: linear, nonlin_1, nonlin_2, ...
 from smp_base.funcs import *
-# model funcs from smp_graphs
+# model funcs from smp_graphs, FIXME: move that into smp_base
 from smp_graphs.funcs_models import model
 
 import logging
