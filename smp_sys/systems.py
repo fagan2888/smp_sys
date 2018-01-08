@@ -87,7 +87,7 @@ from smp_graphs.funcs_models import model
 
 import logging
 from smp_base.common import get_module_logger
-logger = get_module_logger(modulename = 'systems', loglevel = logging.INFO)
+logger = get_module_logger(modulename = 'systems', loglevel = logging.DEBUG)
 
 # dummy block ref
 class bla(object):
@@ -119,7 +119,7 @@ class SMPSys(object):
     defaults = {
         'order': 0,
         'dims': {
-            's0': {'dim': 1, 'dist': 0.,},
+            's0': {'dim': 1, 'dist': 0.},
         },
         'mem': 1,
         'cnt': 0,
@@ -326,7 +326,7 @@ class Pointmass2Sys(SMPSys):
         'order': 0,
         'dims': {
             # 'm0': {'dim': 1, 'dist': 0, 'initial': np.zeros((1, 1)), 'lag': 1},
-            's0': {'dim': 1, 'dist': 0, 'initial': np.random.uniform(-1.0, 1.0, (1, 1)), }, # mins, maxs
+            's0': {'dim': 1, 'dist': 0, 'initial': np.random.uniform(-1.0, 1.0, (1, 1))} # mins, maxs
         },
         'x': {},
         'lag': 1,
@@ -347,7 +347,8 @@ class Pointmass2Sys(SMPSys):
         'anoise_std': 2e-2,
         'vnoise_mean': 0.0,
         'vnoise_std': 1e-6,
-        }
+        'numelem': 101,
+    }
     
     def __init__(self, conf = {}):
         """Pointmass2Sys.__init__
@@ -478,7 +479,7 @@ class Pointmass2Sys(SMPSys):
             # add dim if necessary
             if not self.dims.has_key(ordk):
                 self.dims[ordk] = {'dim': self.sysdim, 'dist': float(o), 'initial': np.random.uniform(-1, 1, (self.sysdim, 1))}
-                self._debug("adding variable %s = %s to comply with system order %d" % (ordk, self.dims[ordk], self.order))
+                logger.debug("adding variable %s = %s to comply with system order %d", ordk, self.dims[ordk], self.order)
 
     def check_dims_motor(self):
         mks = [k for k in self.dims.keys() if k.startswith('m')]
@@ -487,7 +488,7 @@ class Pointmass2Sys(SMPSys):
         if len(mks) < 1:
             # add default motor at order 0
             mks.append('m0')
-            self.dims['m0'] = {'dim': self.sysdim, 'dist': 0, 'initial': np.zeros((self.sysdim, 1)), 'lag': self.lag},
+            self.dims['m0'] = {'dim': self.sysdim, 'dist': 0, 'initial': np.zeros((self.sysdim, 1)), 'lag': self.lag}
         # sort motor keys
         mks.sort()
         # infer highest order of motor input
@@ -500,6 +501,7 @@ class Pointmass2Sys(SMPSys):
         """
         # state vector: array or dict? set initial state from config
         for dk, dv in self.dims.items():
+            logger.debug("dk = %s, dv = %s", dk, dv)
             # required entries
             if not dv.has_key('initial'):
                 dv['initial'] = np.random.uniform(-1, 1, (dv['dim'], 1))
