@@ -390,6 +390,7 @@ class Pointmass2Sys(SMPSys):
             [partial(f, a = np.random.uniform(-1, 1), b = np.random.uniform(-1, 1)) for f in [linear, nonlin_1, nonlin_3]], # nonlin_2,
             [linear, nonlin_1, nonlin_2, nonlin_3],
             self.get_transfer_lookup(),
+            [partial(nonlin_cosine, a = 1.0)],
         ]
         
         # if self.transfer > 0:
