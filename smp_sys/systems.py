@@ -328,7 +328,7 @@ class Pointmass2Sys(SMPSys):
             # 'm0': {'dim': 1, 'dist': 0, 'initial': np.zeros((1, 1)), 'lag': 1},
             's0': {'dim': 1, 'dist': 0, 'initial': np.random.uniform(-1.0, 1.0, (1, 1))} # mins, maxs
         },
-        'x': {},
+        'x': {}, # initialize x
         'lag': 1,
         'dt': 1e-1,
         'mass': 1.0,
@@ -391,6 +391,7 @@ class Pointmass2Sys(SMPSys):
             [linear, nonlin_1, nonlin_2, nonlin_3],
             self.get_transfer_lookup(),
             [partial(nonlin_cosine, a = 1.0)],
+            [np.tanh],
         ]
         
         # if self.transfer > 0:
@@ -641,6 +642,10 @@ class Pointmass2Sys(SMPSys):
             # ordk_ = 's%d' % (min(self.order, o+1),)
             ordk_ = 's%d' % (max(0, o - 1),)
             # print "ordk", ordk, ordk_
+
+            # 20180129 reassume
+            # motor input at every order
+            # motor input from own past (memory / qtap)
             
             # this assumes motor input always at highest order
             self.x[ordk] *= 1 - self.dims[ordk]['dissipation']
