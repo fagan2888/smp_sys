@@ -391,6 +391,7 @@ class Pointmass2Sys(SMPSys):
             [linear, nonlin_1, nonlin_2, nonlin_3],
             self.get_transfer_lookup(),
             [partial(nonlin_cosine, a = 1.0)],
+            [partial(nonlin_cosine, a = np.pi/2, b = -np.pi/2)],
             [np.tanh],
         ]
         
