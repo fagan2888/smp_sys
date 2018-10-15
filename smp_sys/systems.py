@@ -104,7 +104,7 @@ class SMPSys(object):
         # set_attr_from_dict_ifs(self, ifs_conf)
         
         # self.id = self.__class__.__name__
-        for k, v in conf.items():
+        for k, v in list(conf.items()):
             setattr(self, k, v)
             # print "%s.init self.%s = %s" % (self.__class__.__name__, k, v)
 
@@ -711,10 +711,10 @@ class SimplearmSys(SMPSys):
         -- order: NOT IMPLEMENT (control mode of the system, order = 0 kinematic, 1 velocity, 2 force)
         """
         # check defaults
-        for k in self.defaults.keys():
-            if not conf.has_key(k):
+        for k in list(self.defaults.keys()):
+            if k not in conf:
                 conf[k] = self.defaults[k]
-            assert conf.has_key(k), "conf doesn't have required attribute %s, defaults = %s" % (k, self.defaults[k])
+            assert k in conf, "conf doesn't have required attribute %s, defaults = %s" % (k, self.defaults[k])
         
         SMPSys.__init__(self, conf)
         
@@ -863,7 +863,7 @@ if __name__ == "__main__":
     - plot timeseries
     """
     for c in sysclasses:
-        print "class", c
+        print("class", c)
         c_ = c(conf = c.defaults)
         c_data = []
         for i in range(1000):

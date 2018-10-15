@@ -33,8 +33,8 @@ from collections import OrderedDict
 try:
     import rospy
     from tf.transformations import euler_from_quaternion, quaternion_from_euler
-except Exception, e:
-    print "Import rospy failed with %s" % (e, )
+except Exception as e:
+    print("Import rospy failed with %s" % (e, ))
 
 from std_msgs.msg      import Float64MultiArray, Float32MultiArray
 from std_msgs.msg      import Float32, ColorRGBA, Bool
@@ -83,7 +83,7 @@ class STDRCircularSys(SMPSys):
 
         if not self.ros:
             import sys
-            print "ROS not configured but this robot (%s) requires ROS, exiting" % (self.__class__.__name__)
+            print("ROS not configured but this robot (%s) requires ROS, exiting" % (self.__class__.__name__))
             sys.exit(1)
             
         # timing
@@ -227,7 +227,7 @@ class LPZBarrelSys(SMPSys):
 
         if not self.ros:
             import sys
-            print "ROS not configured but this robot (%s) requires ROS, exiting" % (self.__class__.__name__)
+            print("ROS not configured but this robot (%s) requires ROS, exiting" % (self.__class__.__name__))
             sys.exit(1)
 
         self.pubs = {
@@ -377,7 +377,7 @@ class SpheroSys(SMPSys):
 
         if not self.ros:
             import sys
-            print "ROS not configured but this robot (%s) requires ROS, exiting" % (self.__class__.__name__)
+            print("ROS not configured but this robot (%s) requires ROS, exiting" % (self.__class__.__name__))
             sys.exit(1)
 
         # self.pubs = {
@@ -448,7 +448,7 @@ class SpheroSys(SMPSys):
         """$ rostopic pub /disable_stabilization std_msgs/Bool False"""
         stab = Bool()
         stab.data = False
-        print "stab", stab, stab.data
+        print("stab", stab, stab.data)
         for i in range(5):
             self.pubs['_set_stab'].publish(stab)
         
@@ -493,7 +493,7 @@ class SpheroSys(SMPSys):
                          self.odom.pose.pose.position.x * self.pos_gain,
                          self.odom.pose.pose.position.y * self.pos_gain,
                          )
-        print "%s.prepare_inputs_all inputs = %s" % (self.__class__.__name__, inputs)
+        print("%s.prepare_inputs_all inputs = %s" % (self.__class__.__name__, inputs))
         return np.array([inputs])
 
     def prepare_inputs(self):
@@ -501,7 +501,7 @@ class SpheroSys(SMPSys):
         # print "self.odom", self.odom
         inputs = (self.odom.twist.twist.linear.x * self.linear_gain, self.odom.twist.twist.linear.y * self.linear_gain)
         # inputs = (self.odom.twist.twist.linear.x * self.linear_gain, self.odom.twist.twist.angular.z * self.angular_gain)
-        print "%s.prepare_inputs inputs = %s" % (self.__class__.__name__, inputs)
+        print("%s.prepare_inputs inputs = %s" % (self.__class__.__name__, inputs))
         return np.array([inputs])
 
     def prepare_output(self, y):
@@ -509,14 +509,14 @@ class SpheroSys(SMPSys):
         self.motors.linear.x = y[0,0] * self.output_gain
         self.motors.linear.y = y[1,0] * self.output_gain
         self.pubs["_cmd_vel"].publish(self.motors)
-        print "%s.prepare_output y = %s , motors = %s" % (self.__class__.__name__, y, self.motors)
+        print("%s.prepare_output y = %s , motors = %s" % (self.__class__.__name__, y, self.motors))
 
     def prepare_output_vel_raw(self, y):
         """SpheroSys.prepare_output_vel_raw"""
         self.motors.linear.x  = y[1,0] * self.output_gain * 1.414 # ?
         self.motors.angular.z = y[0,0] * 1 # self.output_gain
         self.pubs["_cmd_vel_raw"].publish(self.motors)
-        print "%s.prepare_output_vel_raw y = %s , motors = %s" % (self.__class__.__name__, y, self.motors)
+        print("%s.prepare_output_vel_raw y = %s , motors = %s" % (self.__class__.__name__, y, self.motors))
         
     def prepare_output_raw_motors(self, y):
         """SpheroSys.prepare_output_raw_motors"""
@@ -527,11 +527,11 @@ class SpheroSys(SMPSys):
         self.raw_motors.data[2] = int(np.sign(y[1,0]) * 0.5 + 1.5)
         self.raw_motors.data[3] = int(np.abs(y[1,0]) * 100 + 60)
         self.pubs["_cmd_raw_motors"].publish(self.raw_motors)
-        print "%s.prepare_output y = %s , motors = %s" % (self.__class__.__name__, y, self.raw_motors)
+        print("%s.prepare_output y = %s , motors = %s" % (self.__class__.__name__, y, self.raw_motors))
 
     def step(self, x):
         """SpheroSys.step"""
-        print "x", x
+        print("x", x)
         if rospy.is_shutdown(): return
         # x_ = self.prepare_inputs()
 
@@ -569,7 +569,7 @@ if __name__ == "__main__":
     # init sys
     r = syscls(conf = r_conf)
 
-    print "%s robot = %s" % (args.system, r)
+    print("%s robot = %s" % (args.system, r))
 
     # run a couple of steps
     numsteps = args.numsteps

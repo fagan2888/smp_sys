@@ -444,7 +444,7 @@ def main():
         lens_ = np.random.uniform(0.1, 1, (1, 9))
         lens = bha.compute_motor_command(lens_)
         eepos = bha.compute_sensori_effect(lens)
-        print "bha[%d] m = %s, eepos = %s" % (i, lens, eepos)
+        print("bha[%d] m = %s, eepos = %s" % (i, lens, eepos))
 
         bha.visualize(ax, lens)
         plt.draw()
