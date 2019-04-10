@@ -480,12 +480,12 @@ class Pointmass2Sys(SMPSys):
         for o in range(self.order + 1):
             ordk = 's%d' % (o, )
             # add dim if necessary
-            if not self.dims.has_key(ordk):
+            if ordk not in self.dims:
                 self.dims[ordk] = {'dim': self.sysdim, 'dist': float(o), 'initial': np.random.uniform(-1, 1, (self.sysdim, 1))}
                 logger.debug("adding variable %s = %s to comply with system order %d", ordk, self.dims[ordk], self.order)
 
     def check_dims_motor(self):
-        mks = [k for k in self.dims.keys() if k.startswith('m')]
+        mks = [k for k in list(self.dims.keys()) if k.startswith('m')]
         # print "motor keys = %s" % (mks, )
         # no motor definitions
         if len(mks) < 1:
@@ -503,18 +503,18 @@ class Pointmass2Sys(SMPSys):
         Reset state x to initial state x0
         """
         # state vector: array or dict? set initial state from config
-        for dk, dv in self.dims.items():
+        for dk, dv in list(self.dims.items()):
             logger.debug("dk = %s, dv = %s", dk, dv)
             # required entries
-            if not dv.has_key('initial'):
+            if 'initial' not in dv:
                 dv['initial'] = np.random.uniform(-1, 1, (dv['dim'], 1))
-            if not dv.has_key('dissipation'):
+            if 'dissipation' not in dv:
                 dv['dissipation'] = 0.0
 
             # motor special: augment dims with additional motor variables
             if dk[0] == 'm': # dk.startswith('m'):
                 # fix missing lag
-                if not dv.has_key('lag'):
+                if 'lag' not in dv:
                     # logger.debug("        dimv is missing lag param, setting dimv.lag to global lag = %d" % (self.lag, ))
                     dv['lag'] = self.lag
                 # add motor delayline entry
@@ -591,7 +591,7 @@ class Pointmass2Sys(SMPSys):
         #  - by applying a transfer function (lookup table, distortion d, smoothness s)
         #  - by applying constraints (self limits)
         #  - by adding entropy
-        for mk, mv in [(k, v) for k, v in self.dims.items() if k[0] == 'm']:
+        for mk, mv in [(k, v) for k, v in list(self.dims.items()) if k[0] == 'm']:
             # get delayed motor prediction key
             dlmk = self.get_k_plus(mk, 'd')
             # get instantaneous motor measurement key
@@ -656,7 +656,7 @@ class Pointmass2Sys(SMPSys):
             if ordk == ordk_: # at bottom order index / top order
                 x_tm1 = 0
                 
-            if self.dims.has_key('m%d' % o): # have explicit input at order
+            if 'm%d' % o in self.dims: # have explicit input at order
                 mk_ = 'm%d' % (max(0, o - 1), )
                 orddlmk = mk_
                 # orddlmk = self.get_k_plus(mk_, 'd') # 'm%d' % (max(0, o - 1), )
@@ -802,7 +802,7 @@ class Pointmass2Sys(SMPSys):
         #         's_extero':  self.compute_sensors_extero(),
         #         's_all':     self.compute_sensors(),
         # }
-        rdict = dict([(dk, self.compute_sensors(dk)) for dk in self.dims.keys()])
+        rdict = dict([(dk, self.compute_sensors(dk)) for dk in list(self.dims.keys())])
         # legacy hack
         if self.order == 0:
             rdict['s1'] = self.x['s0']
@@ -921,10 +921,10 @@ class SimplearmSys(SMPSys):
         -- order: NOT IMPLEMENT (control mode of the system, order = 0 kinematic, 1 velocity, 2 force)
         """
         # check defaults
-        for k in self.defaults.keys():
-            if not conf.has_key(k):
+        for k in list(self.defaults.keys()):
+            if k not in conf:
                 conf[k] = self.defaults[k]
-            assert conf.has_key(k), "conf doesn't have required attribute %s, defaults = %s" % (k, self.defaults[k])
+            assert k in conf, "conf doesn't have required attribute %s, defaults = %s" % (k, self.defaults[k])
         
         SMPSys.__init__(self, conf)
         
@@ -1073,7 +1073,7 @@ if __name__ == "__main__":
     - plot timeseries
     """
     for c in sysclasses:
-        print "class", c
+        print("class", c)
         c_ = c(conf = c.defaults)
         c_data = []
         for i in range(1000):
