@@ -79,15 +79,18 @@ TODO:
 import copy
 from functools import partial
 import numpy as np
+from pprint import pformat
 
 # import transfer functions: linear, nonlin_1, nonlin_2, ...
 from smp_base.funcs import *
+
 # model funcs from smp_graphs, FIXME: move that into smp_base
-from smp_graphs.funcs_models import model
+# from smp_graphs.funcs_models import model
+from smp_base.models_funcmapped import model
 
 import logging
 from smp_base.common import get_module_logger
-logger = get_module_logger(modulename = 'systems', loglevel = logging.DEBUG)
+logger = get_module_logger(modulename = 'systems', loglevel = logging.INFO)
 
 # dummy block ref
 class bla(object):
@@ -220,7 +223,7 @@ class PointmassSys(SMPSys):
         # self.state_dim
         # if not hasattr(self, 'x0'):
         #     self.x0 = np.zeros((self.statedim, 1))
-        # self.x  = self.x0.copy()
+        self.x  = self.x0.copy()
         self.cnt = 0
 
     def reset(self):
@@ -504,7 +507,7 @@ class Pointmass2Sys(SMPSys):
         """
         # state vector: array or dict? set initial state from config
         for dk, dv in list(self.dims.items()):
-            logger.debug("dk = %s, dv = %s", dk, dv)
+            logger.debug("state dimension key dk = %s, val dv = %s", dk, dv)
             # required entries
             if 'initial' not in dv:
                 dv['initial'] = np.random.uniform(-1, 1, (dv['dim'], 1))
@@ -804,6 +807,7 @@ class Pointmass2Sys(SMPSys):
         # }
         rdict = dict([(dk, self.compute_sensors(dk)) for dk in list(self.dims.keys())])
         # legacy hack
+        rdict['s_all'] = self.x['s0']
         if self.order == 0:
             rdict['s1'] = self.x['s0']
         # logger.debug("    step        rdict['s0'] = %s", rdict['s0'])
@@ -1060,9 +1064,7 @@ class SimplearmSys(SMPSys):
                 
 
     
-sysclasses = [SimplearmSys, PointmassSys]
-# sysclasses = [SimplearmSys]
-
+sysclasses = [SimplearmSys, PointmassSys, Pointmass2Sys]
 
 if __name__ == "__main__":
     """smp_sys.systems.main
@@ -1072,10 +1074,18 @@ if __name__ == "__main__":
     - run system for 1000 steps on it's own proprioceptive (motor) sensors
     - plot timeseries
     """
-    for c in sysclasses:
+    import matplotlib.pylab as plt
+
+    plt.ion()
+    fig = plt.figure(figsize=(len(sysclasses) * 5, 3))
+    plt.show()
+    
+    for c_i, c in enumerate(sysclasses):
         print("class", c)
         c_ = c(conf = c.defaults)
         c_data = []
+
+        # minimal stepping
         for i in range(1000):
             # do proprio feedback
             x = c_.compute_sensors_proprio() * 0.1
@@ -1085,10 +1095,16 @@ if __name__ == "__main__":
             # print "d", d.shape
             c_data.append(d)
 
-        # print c_data
+        # print(c_data)
         # print np.array(c_data).shape
+        print(pformat(list(c_.x)))
+        print(pformat(list(d)))
 
-        import matplotlib.pylab as plt
+        ax = fig.add_subplot(1, len(sysclasses), c_i + 1)
         # remove additional last axis
-        plt.plot(np.array(c_data)[...,0])
-        plt.show()
+        ax.set_title(c.__name__)
+        ax.plot(np.array(c_data)[...,0])
+        plt.draw()
+
+    plt.ioff()
+    plt.show()
